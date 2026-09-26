@@ -1,7 +1,9 @@
-"""Named gesture actions and how they are executed on Windows.
+"""Named gesture actions and how they are executed on each platform.
 
-The phone decides *which* action a gesture maps to (that is where the
-user's settings live). The host only knows how to *perform* an action.
+The phone decides *which* action a gesture maps to (that is where the user's
+settings live). The host only knows how to *perform* an action here.
+
+Key name "win" means the Windows key on Windows/Linux and Cmd on macOS.
 """
 from __future__ import annotations
 
@@ -10,6 +12,7 @@ from typing import Callable
 
 from .injector import Injector
 from .keys import parse_combo
+from .platform_info import OS
 
 
 @dataclass(frozen=True)
@@ -34,49 +37,57 @@ def _nothing(_: Injector) -> None:
     return None
 
 
-ACTIONS: dict[str, Action] = {
-    a.name: a for a in [
-        Action("none", "Nothing", _nothing),
-        Action("taskview", "Task view", _combo("win", "tab")),
-        Action("showdesktop", "Show desktop", _combo("win", "d")),
-        Action("hideothers", "Hide everything except the focused app", _combo("win", "home")),
-        Action("switchapp_next", "Switch to next app", _combo("alt", "tab")),
-        Action("switchapp_prev", "Switch to previous app", _combo("alt", "shift", "tab")),
-        Action("desktop_next", "Next virtual desktop", _combo("ctrl", "win", "right")),
-        Action("desktop_prev", "Previous virtual desktop", _combo("ctrl", "win", "left")),
-        Action("newdesktop", "New virtual desktop", _combo("ctrl", "win", "d")),
-        Action("closedesktop", "Close virtual desktop", _combo("ctrl", "win", "f4")),
-        Action("search", "Open search", _combo("win", "s")),
-        Action("notifications", "Notification center", _combo("win", "n")),
-        Action("quicksettings", "Quick settings", _combo("win", "a")),
-        Action("copilot", "Copilot", _combo("win", "c")),
-        Action("settings", "Windows settings", _combo("win", "i")),
-        Action("explorer", "File Explorer", _combo("win", "e")),
-        Action("startmenu", "Start menu", _combo("win",)),
-        Action("snap_left", "Snap window left", _combo("win", "left")),
-        Action("snap_right", "Snap window right", _combo("win", "right")),
-        Action("maximize", "Maximize window", _combo("win", "up")),
-        Action("minimize", "Minimize window", _combo("win", "down")),
-        Action("closewindow", "Close window", _combo("alt", "f4")),
-        Action("back", "Back", _combo("alt", "left")),
-        Action("forward", "Forward", _combo("alt", "right")),
-        Action("undo", "Undo", _combo("ctrl", "z")),
-        Action("redo", "Redo", _combo("ctrl", "y")),
-        Action("copy", "Copy", _combo("ctrl", "c")),
-        Action("paste", "Paste", _combo("ctrl", "v")),
-        Action("volume_up", "Volume up", _combo("volumeup",)),
-        Action("volume_down", "Volume down", _combo("volumedown",)),
-        Action("mute", "Mute", _combo("volumemute",)),
-        Action("playpause", "Play / pause", _combo("playpause",)),
-        Action("next_track", "Next track", _combo("nexttrack",)),
-        Action("prev_track", "Previous track", _combo("prevtrack",)),
-        Action("middleclick", "Middle click", _click("middle")),
-        Action("rightclick", "Right click", _click("right")),
-        Action("leftclick", "Left click", _click("left")),
-        Action("screenshot", "Screenshot (Snipping Tool)", _combo("win", "shift", "s")),
-        Action("lock", "Lock PC", _combo("win", "l")),
-    ]
-}
+def _per_os(win: tuple[str, ...] | None, mac: tuple[str, ...] | None, linux: tuple[str, ...] | None):
+    """Pick the combo for this OS; None means the action does nothing here."""
+    combo = {"win": win, "mac": mac, "linux": linux}[OS]
+    return _combo(*combo) if combo else _nothing
+
+
+# name, label, windows combo, macOS combo, linux (GNOME defaults) combo
+_TABLE: list[tuple[str, str, tuple | None, tuple | None, tuple | None]] = [
+    ("taskview", "Task view / Mission Control", ("win", "tab"), ("ctrl", "up"), ("win",)),
+    ("showdesktop", "Show desktop", ("win", "d"), ("f11",), ("ctrl", "win", "d")),
+    ("hideothers", "Hide everything except the focused app", ("win", "home"), ("win", "alt", "h"), None),
+    ("switchapp_next", "Switch to next app", ("alt", "tab"), ("win", "tab"), ("alt", "tab")),
+    ("switchapp_prev", "Switch to previous app", ("alt", "shift", "tab"), ("win", "shift", "tab"), ("alt", "shift", "tab")),
+    ("desktop_next", "Next virtual desktop", ("ctrl", "win", "right"), ("ctrl", "right"), ("win", "pagedown")),
+    ("desktop_prev", "Previous virtual desktop", ("ctrl", "win", "left"), ("ctrl", "left"), ("win", "pageup")),
+    ("newdesktop", "New virtual desktop", ("ctrl", "win", "d"), None, None),
+    ("closedesktop", "Close virtual desktop", ("ctrl", "win", "f4"), None, None),
+    ("search", "Open search", ("win", "s"), ("win", "space"), ("win",)),
+    ("notifications", "Notification center", ("win", "n"), None, ("win", "v")),
+    ("quicksettings", "Quick settings", ("win", "a"), None, None),
+    ("copilot", "Copilot / assistant", ("win", "c"), None, None),
+    ("settings", "System settings", ("win", "i"), ("win", ","), None),
+    ("explorer", "File manager", ("win", "e"), None, None),
+    ("startmenu", "Start menu / Launchpad", ("win",), ("win", "space"), ("win",)),
+    ("snap_left", "Snap window left", ("win", "left"), None, ("win", "left")),
+    ("snap_right", "Snap window right", ("win", "right"), None, ("win", "right")),
+    ("maximize", "Maximize window", ("win", "up"), ("ctrl", "win", "f"), ("win", "up")),
+    ("minimize", "Minimize window", ("win", "down"), ("win", "m"), ("win", "h")),
+    ("closewindow", "Close window", ("alt", "f4"), ("win", "w"), ("alt", "f4")),
+    ("back", "Back", ("alt", "left"), ("win", "["), ("alt", "left")),
+    ("forward", "Forward", ("alt", "right"), ("win", "]"), ("alt", "right")),
+    ("undo", "Undo", ("ctrl", "z"), ("win", "z"), ("ctrl", "z")),
+    ("redo", "Redo", ("ctrl", "y"), ("win", "shift", "z"), ("ctrl", "shift", "z")),
+    ("copy", "Copy", ("ctrl", "c"), ("win", "c"), ("ctrl", "c")),
+    ("paste", "Paste", ("ctrl", "v"), ("win", "v"), ("ctrl", "v")),
+    ("volume_up", "Volume up", ("volumeup",), ("volumeup",), ("volumeup",)),
+    ("volume_down", "Volume down", ("volumedown",), ("volumedown",), ("volumedown",)),
+    ("mute", "Mute", ("volumemute",), ("volumemute",), ("volumemute",)),
+    ("playpause", "Play / pause", ("playpause",), ("playpause",), ("playpause",)),
+    ("next_track", "Next track", ("nexttrack",), ("nexttrack",), ("nexttrack",)),
+    ("prev_track", "Previous track", ("prevtrack",), ("prevtrack",), ("prevtrack",)),
+    ("screenshot", "Screenshot", ("win", "shift", "s"), ("win", "shift", "4"), ("printscreen",)),
+    ("lock", "Lock screen", ("win", "l"), ("ctrl", "win", "q"), ("win", "l")),
+]
+
+ACTIONS: dict[str, Action] = {"none": Action("none", "Nothing", _nothing)}
+for _name, _label, _w, _m, _l in _TABLE:
+    ACTIONS[_name] = Action(_name, _label, _per_os(_w, _m, _l))
+ACTIONS["middleclick"] = Action("middleclick", "Middle click", _click("middle"))
+ACTIONS["rightclick"] = Action("rightclick", "Right click", _click("right"))
+ACTIONS["leftclick"] = Action("leftclick", "Left click", _click("left"))
 
 CUSTOM_PREFIX = "keys:"
 

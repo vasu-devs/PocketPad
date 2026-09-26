@@ -31,6 +31,7 @@ from .config import (
 )
 from .injector import Injector
 from .keys import is_known_key, normalize_key
+from .platform_info import SWITCHER_MOD
 from .smoother import MotionSmoother
 
 log = logging.getLogger(__name__)
@@ -122,11 +123,11 @@ class Session:
         inj = self.injector
         if phase in ("start", "step"):
             if not self._alt_held:
-                inj.key("alt", True)
+                inj.key(SWITCHER_MOD, True)
                 self._alt_held = True
             inj.key_combo(("tab",) if d >= 0 else ("shift", "tab"))
         elif phase == "end" and self._alt_held:
-            inj.key("alt", False)
+            inj.key(SWITCHER_MOD, False)
             self._alt_held = False
 
     # ---- binary fast path -----------------------------------------------

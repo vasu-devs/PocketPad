@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 APP_NAME = "PocketPad"
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 
 def _web_dir() -> Path:

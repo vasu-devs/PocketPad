@@ -17,6 +17,7 @@ from .config import APP_NAME, VERSION, HostConfig
 from .injector import FakeInjector
 from .mouseaccel import MouseAccelGuard
 from .netmodes import hotspot_ip, setup_usb, start_hotspot
+from .platform_info import OS, session_notes
 from .server import create_app
 
 log = logging.getLogger("pocketpad")
@@ -104,19 +105,29 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=config.log_level.upper(),
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-    if args.dry_run or sys.platform != "win32":
-        if sys.platform != "win32":
-            log.warning("not on Windows: running in dry-run mode")
+    if args.dry_run:
         injector = _LoggingInjector()
-    else:
+    elif OS == "win":
         from .input_win import WindowsInjector
         injector = WindowsInjector()
+    else:
+        from .input_pynput import PynputInjector
+        try:
+            injector = PynputInjector()
+        except RuntimeError as e:
+            print(f"\n  {e}\n  Falling back to --dry-run (nothing will move).\n")
+            injector = _LoggingInjector()
+    for note in session_notes():
+        print("  " + note)
 
     app = create_app(config, injector)
 
     prefer_ip = None
     usb_ok = False
-    if args.hotspot:
+    if args.hotspot and OS != "win":
+        print("\n  --hotspot is Windows only. Turn on your computer's hotspot from its own settings, "
+              "then use the address shown below.")
+    elif args.hotspot:
         ok, msg = start_hotspot()
         print("\n  " + msg)
         prefer_ip = hotspot_ip() if ok else None

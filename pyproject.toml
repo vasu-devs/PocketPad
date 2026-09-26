@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pocketpad"
-version = "0.2.0"
-description = "Use your phone as a Windows precision-style trackpad over Wi-Fi, hotspot or USB. No app to install on the phone."
+version = "0.3.0"
+description = "Use your phone as a precision-style trackpad for Windows, macOS and Linux over Wi-Fi, hotspot or USB. No app to install on the phone."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -16,12 +16,15 @@ classifiers = [
   "Intended Audience :: End Users/Desktop",
   "License :: OSI Approved :: MIT License",
   "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
   "Topic :: Utilities",
 ]
 dependencies = [
   "aiohttp>=3.9",
   "qrcode>=7.4",
+  "pynput>=1.7; sys_platform != 'win32'",
 ]
 
 [project.optional-dependencies]

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 (2026-09-27)
+
+- macOS and Linux hosts (pynput: Quartz on macOS, X11 XTest on Linux) with per-platform shortcut tables and preference readers.
+- CI builds and smoke-tests PocketPad-windows.exe, PocketPad-macos and PocketPad-linux and attaches them to releases.
+- Website at pocketpad.vercel.app.
+
 ## 0.2.0 (2026-09-27)
 
 - Packaged as `pocketpad` (pip / pipx installable, `pocketpad` command) and as a one-file Windows exe.

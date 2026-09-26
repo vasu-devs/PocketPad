@@ -1,6 +1,8 @@
 # PocketPad
 
-Use your phone as a Windows precision-style trackpad. Nothing to install on the
+**Website and downloads: [pocketpad.vercel.app](https://pocketpad.vercel.app)**
+
+Use your phone as a precision-style trackpad for Windows, macOS and Linux. Nothing to install on the
 phone: a small host runs on the laptop, the phone opens a web page, and every
 gesture you know from a Windows touchpad works, using the settings your PC
 already has.
@@ -21,9 +23,13 @@ phone browser  --Wi-Fi / hotspot / USB-->  PocketPad host (Windows)  --SendInput
 
 Pick one.
 
-**Just the exe.** Download `PocketPad.exe` from the
-[latest release](https://github.com/vasu-devs/PocketPad/releases/latest) and run
-it. Windows SmartScreen may ask once because the file is unsigned.
+**One file, no installer**, from the [latest release](https://github.com/vasu-devs/PocketPad/releases/latest):
+
+| OS | File | Notes |
+|---|---|---|
+| Windows | `PocketPad-windows.exe` | SmartScreen asks once (unsigned) |
+| macOS | `PocketPad-macos` | `chmod +x`, `xattr -d com.apple.quarantine`, grant Accessibility to Terminal |
+| Linux | `PocketPad-linux` | `chmod +x`; X11 sessions get full control, Wayland reaches XWayland apps only |
 
 **pipx or pip** (Python 3.10+):
 
@@ -155,6 +161,12 @@ DevTools touch events) for move, tap, two-finger tap, scroll, pinch, three and
 four finger swipes, the live app switcher, double-tap drag, the scroll strip and
 orientation rotation. `--dry-run` logs injected events without moving anything.
 CI runs the tests and builds the exe on every push; a `v*` tag publishes a release.
+
+## Platform notes
+
+- **Windows** is the reference platform: native SendInput, registry-backed preference sync, hotspot mode, pointer-speed compensation.
+- **macOS** injects through Quartz via pynput and needs Accessibility permission. Shortcuts map to Mission Control, Cmd+Tab, Spaces, Cmd-based editing keys.
+- **Linux** injects through X11 XTest via pynput; shortcuts follow GNOME defaults and can be remapped from the phone. A uinput backend for Wayland is the next step.
 
 ## Known limits
 

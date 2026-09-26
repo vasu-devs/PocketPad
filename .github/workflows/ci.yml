@@ -7,32 +7,72 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: PocketPad-windows.exe
+          - os: macos-latest
+            artifact: PocketPad-macos
+          - os: ubuntu-latest
+            artifact: PocketPad-linux
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Linux desktop libs
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb libxkbcommon-x11-0 x11-utils
       - run: pip install -e .[dev]
-      - run: python -m pytest -q
-
-  exe:
-    needs: test
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -e .[dev]
-      - run: python build_exe.py
+      - name: Unit tests
+        run: python -m pytest -q --ignore=tests/test_smoke_injector.py
+      - name: Smoke test (real pointer, Windows / macOS)
+        if: runner.os != 'Linux'
+        env:
+          POCKETPAD_SMOKE: "1"
+        run: python -m pytest -q tests/test_smoke_injector.py -rs
+      - name: Smoke test (real pointer, Linux under Xvfb)
+        if: runner.os == 'Linux'
+        env:
+          POCKETPAD_SMOKE: "1"
+        run: xvfb-run -a -s "-screen 0 1280x800x24" python -m pytest -q tests/test_smoke_injector.py -rs
+      - name: Build binary
+        run: python build_exe.py
+      - name: Binary starts and serves the app
+        shell: bash
+        env:
+          DISPLAY: ":99"
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then Xvfb :99 -screen 0 1280x800x24 & sleep 1; fi
+          ./dist/${{ matrix.artifact }} --key 123456 --port 8799 --keep-mouse-accel > host.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8799/api/info > info.json; then break; fi; sleep 1
+          done
+          cat host.log
+          grep -q '"app": "PocketPad"' info.json
+          curl -sf -o /dev/null http://127.0.0.1:8799/static/app.js
       - uses: actions/upload-artifact@v4
         with:
-          name: PocketPad-windows
-          path: dist/PocketPad.exe
-      - if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
         with:
-          files: dist/PocketPad.exe
+          path: dist
+          merge-multiple: true
+      - run: ls -la dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
           generate_release_notes: true

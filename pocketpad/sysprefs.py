@@ -94,6 +94,9 @@ def _direction_map(raw: dict[str, Any], prefix: str, fallback_preset: str) -> di
 
 def read_touchpad_prefs() -> dict[str, Any]:
     """Return a JSON-friendly snapshot of the user's touchpad preferences."""
+    if sys.platform != "win32":
+        from .sysprefs_posix import read_posix_prefs
+        return read_posix_prefs()
     raw = _read_key(PTP_KEY)
     mouse = _read_key(MOUSE_KEY)
     merged = {**DEFAULTS, **raw}
@@ -117,6 +120,7 @@ def read_touchpad_prefs() -> dict[str, Any]:
         "threeSlide": slide("ThreeFinger"),
         "fourSlide": slide("FourFinger"),
         "mouseAccel": _flag(mouse.get("MouseSpeed", 1)),
+        "os": "win",
     }
     log.info("touchpad prefs: speed=%s natural=%s 3f=%s 4f=%s", prefs["cursorSpeed"],
              prefs["natural"], prefs["threeSlide"]["preset"], prefs["fourSlide"]["preset"])
