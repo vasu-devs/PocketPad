@@ -13,13 +13,21 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import urllib.request
 import zipfile
 from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-TOOLS_DIR = Path(__file__).resolve().parent.parent / "tools"
+def _tools_dir() -> Path:
+    # Frozen exe: keep downloads next to the exe rather than in the temp unpack dir.
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent / "tools"
+    return Path(__file__).resolve().parent.parent / "tools"
+
+
+TOOLS_DIR = _tools_dir()
 PLATFORM_TOOLS_URL = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
 HOTSPOT_PREFIX = "192.168.137."   # Windows Internet Connection Sharing / Mobile Hotspot range
 

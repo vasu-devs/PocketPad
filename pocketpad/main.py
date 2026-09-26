@@ -1,8 +1,8 @@
 """PocketPad host entry point.
 
-    python -m host                # start on all interfaces, port 8765
-    python -m host --port 9000 --key 123456
-    python -m host --dry-run      # log input instead of injecting it
+    pocketpad                     # start on all interfaces, port 8765
+    pocketpad --port 9000 --key 123456
+    pocketpad --dry-run           # log input instead of injecting it
 """
 from __future__ import annotations
 

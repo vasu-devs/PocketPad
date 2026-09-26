@@ -1,8 +1,8 @@
 import pytest
 
-from host import actions
-from host.injector import FakeInjector
-from host.keys import VK, is_known_key, normalize_key, parse_combo
+from pocketpad import actions
+from pocketpad.injector import FakeInjector
+from pocketpad.keys import VK, is_known_key, normalize_key, parse_combo
 
 
 def test_normalize_aliases():

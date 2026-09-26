@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pocketpad"
+version = "0.2.0"
+description = "Use your phone as a Windows precision-style trackpad over Wi-Fi, hotspot or USB. No app to install on the phone."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Vasudev Siddh" }]
+keywords = ["trackpad", "touchpad", "remote", "mouse", "windows", "phone", "gestures"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Topic :: Utilities",
+]
+dependencies = [
+  "aiohttp>=3.9",
+  "qrcode>=7.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "pyinstaller>=6"]
+
+[project.scripts]
+pocketpad = "pocketpad.main:main"
+
+[project.urls]
+Homepage = "https://github.com/vasu-devs/PocketPad"
+Issues = "https://github.com/vasu-devs/PocketPad/issues"
+
+[tool.setuptools]
+packages = ["pocketpad"]
+
+[tool.setuptools.package-data]
+pocketpad = ["web/*", "web/assets/*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

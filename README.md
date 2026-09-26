@@ -1,107 +1,113 @@
 # PocketPad
 
-Turn your phone into a Windows precision-style trackpad over Wi-Fi. No app store,
-no driver: a small Python host runs on the laptop, and the phone opens a web page.
+Use your phone as a Windows precision-style trackpad. Nothing to install on the
+phone: a small host runs on the laptop, the phone opens a web page, and every
+gesture you know from a Windows touchpad works, using the settings your PC
+already has.
+
+<p>
+  <img src="docs/pad_main.png" width="180" alt="The pad">
+  <img src="docs/pad_settings.png" width="180" alt="Settings following the PC's touchpad">
+  <img src="docs/pad_paper.png" width="180" alt="Paper theme with comet touch effect">
+  <img src="docs/pad_midnight.png" width="180" alt="Midnight theme with a custom accent">
+</p>
 
 ```
-phone browser  --Wi-Fi / WebSocket-->  host (Python, aiohttp)  --SendInput-->  Windows
-   gestures, settings                     validates, injects
+phone browser  --Wi-Fi / hotspot / USB-->  PocketPad host (Windows)  --SendInput-->  cursor
+  gestures, look and feel                   smoothing, validation, injection
 ```
 
-## Quick start
+## Install
 
-1. On the laptop: double-click `PocketPad.bat` (or `python -m host`). It installs
-   `aiohttp` and `qrcode` on first run, then prints a URL and a QR code.
-   When Windows asks, allow Python on **private** networks.
-2. On the phone (same Wi-Fi): scan the QR code or type the URL. It looks like
-   `http://192.168.1.36:8765/?k=123456`. The six-digit `k` is the pairing key
-   and changes every time the host starts (fix it with `--key 123456`).
-3. Tap once to go full screen. Android: "Add to Home screen" gives an icon that
+Pick one.
+
+**Just the exe.** Download `PocketPad.exe` from the
+[latest release](https://github.com/vasu-devs/PocketPad/releases/latest) and run
+it. Windows SmartScreen may ask once because the file is unsigned.
+
+**pipx or pip** (Python 3.10+):
+
+```
+pipx install git+https://github.com/vasu-devs/PocketPad
+pocketpad
+```
+
+**From a clone**: double-click `PocketPad.bat`, or `pip install -e .` and run `pocketpad`.
+
+## Use
+
+1. Run the host. It prints a URL and a QR code. When Windows asks, allow
+   Python or PocketPad on **private** networks.
+2. On the phone, on the same Wi-Fi, scan the QR. The URL carries a six-digit
+   pairing key that changes every start (`--key 123456` fixes it).
+3. Tap once for full screen. Android: "Add to Home screen" gives an icon that
    opens straight into the pad. iPhone: Share, then "Add to Home Screen".
 
-## It follows your touchpad settings
+### Connection modes
 
-On connect the host reads your Windows Precision Touchpad preferences
-(cursor speed, scroll direction, taps, tap-and-drag, pinch, and the three and
-four finger swipe and tap choices) and the phone mirrors them. The settings
-sheet shows "Match this PC's touchpad" at the top with a summary of what it
-found; turn it off to tune the phone independently. Anyone who connects their
-phone to their own PC gets their own feel automatically.
-
-Holding the phone sideways: the layout rotates with the phone. If your phone's
-rotation is locked, pick Landscape in Settings > Surface > Orientation; the app
-asks the browser to rotate and, if that is refused, rotates the touch input
-instead so the cursor still follows your hand.
-
-Two Windows mouse settings would otherwise distort injected motion, so the
-host handles them:
-
-- **Enhance pointer precision** is paused while the host runs and restored on
-  exit (live setting only, the registry is never touched). Use
-  `--keep-mouse-accel` to opt out.
-- The **mouse pointer speed slider** multiplies every injected move (3.5x at
-  the top of the slider). The host cancels that factor so the phone's speed
-  means the same thing on every PC.
-
-## Connection modes
-
-| Mode | Command | Latency | Notes |
+| Mode | Command | Typical latency | Notes |
 |---|---|---|---|
-| Wi-Fi via router | `PocketPad.bat` | 5-30 ms | default, both devices on the same network |
-| Laptop hotspot | `PocketPad.bat --hotspot` | 2-8 ms | turns on Windows Mobile Hotspot, prints its name and password, and shows the laptop's hotspot address (192.168.137.x) first |
-| USB cable (Android) | `PocketPad.bat --usb` | under 1 ms | downloads Google's platform-tools on first use; needs USB debugging on the phone; the phone opens `http://127.0.0.1:8765/?k=...` |
+| Wi-Fi via router | `pocketpad` | 5-30 ms | default |
+| Laptop hotspot | `pocketpad --hotspot` | 2-8 ms | turns on Windows Mobile Hotspot, prints its name, password and the laptop's hotspot address; no router in the path |
+| USB cable (Android) | `pocketpad --usb` | under 1 ms | downloads Google's platform-tools on first use; needs USB debugging on the phone; the phone opens a `127.0.0.1` address |
 
-Motion is sent as 9-byte binary frames, one per touch sample, and the host
-runs a motion smoother that spreads each sample evenly until the next one
-arrives, so Wi-Fi burstiness does not turn into cursor stutter. Disable it
-with `--no-smoothing` to compare.
+Other flags: `--port`, `--bind`, `--no-smoothing`, `--keep-mouse-accel`, `--dry-run`.
 
 ## Gestures
 
-| Fingers | Gesture | Default |
+| Fingers | Gesture | What happens |
 |---|---|---|
-| 1 | move | pointer |
+| 1 | move | pointer, with a speed and acceleration curve |
 | 1 | tap | left click |
-| 1 | tap, then tap and hold | drag (double-tap-drag) |
+| 1 | tap, then tap and hold | drag |
 | 1 | double tap | double click |
+| 1 | drag in the right-edge lane | scroll; flick to coast |
 | 2 | tap | right click |
-| 2 | slide | scroll, natural direction, smooth |
+| 2 | slide | smooth scroll, natural direction |
 | 2 | pinch | zoom (Ctrl + wheel) |
-| 3 | tap | middle click |
+| 3 | tap | your Windows setting (default: search) |
 | 3 | swipe up / down | Task view / Show desktop |
-| 3 | swipe left / right | App switcher opens and follows your hand; lifts to commit, like Windows |
-| 4 | tap | Notification center |
+| 3 | swipe left / right | the app switcher opens and follows your hand; lift to land on an app |
+| 4 | tap | your Windows setting (default: notification center) |
 | 4 | swipe up / down | Task view / Show desktop |
-| 4 | swipe left / right | Switch virtual desktops (repeats) |
+| 4 | swipe left / right | switch virtual desktops (repeats as you keep sliding) |
 
-Everything above is configurable from the settings sheet on the phone (the
-menu button at top right). It mirrors the Windows touchpad settings page:
-pointer speed and acceleration, scroll speed, natural scrolling, notched
-scrolling for legacy apps, tap actions per finger count, the Windows swipe
-presets (switch apps, switch desktops, audio and volume, nothing) or a custom
-action per direction, three-finger drag, on-screen left and right buttons,
-haptics, touch rings, keep-awake. Custom shortcuts are typed as
-`ctrl+shift+t`. Settings are stored on the phone.
+The dock has three buttons: keyboard (type on the PC from the phone, a real
+on/off toggle), rotate (cycles orientation modes), and settings.
 
-The **Aa** button opens the phone keyboard and types into whatever has focus
-on the PC, including Enter, Backspace, arrows and Unicode.
+## It follows your PC
 
-## Appearance
+On connect the host reads your Windows Precision Touchpad preferences (cursor
+speed, scroll direction, taps, tap-and-drag, pinch, three and four finger swipe
+and tap choices) and the phone mirrors them. Settings shows "Match this PC's
+touchpad" at the top with a summary; turn it off to tune the phone on its own.
+Anyone who runs the host on their own PC gets their own feel automatically.
 
-Settings > Appearance: six themes (Graphite, Midnight, Forest, Rose, Pitch
-black, Paper), a free accent colour, pad surface (plain, grid, dots, carbon),
-touch effect (rings, glow, comet, off), round or sharp corners, and vibration
-strength. The dock has a rotate button that cycles orientation modes, and the
-keyboard button is a real toggle: amber means the phone keyboard is open and
-typing goes to the PC.
+Two Windows mouse settings would otherwise distort injected motion, so the host
+handles them: **Enhance pointer precision** is paused while the host runs and
+restored on exit (live setting only, registry untouched; `--keep-mouse-accel`
+opts out), and the **mouse pointer speed slider** multiplier is cancelled so the
+phone's speed means the same thing on every PC.
 
-## Layout
+## Look and feel
+
+Settings > Appearance: six themes (Graphite, Midnight, Forest, Rose, Pitch black,
+Paper), a free accent colour, pad surface (plain, grid, dots, carbon), touch
+effect (rings, glow, comet, off), round or sharp corners, vibration strength.
+Settings > Surface: orientation, scroll strip, on-screen mouse buttons, keep
+screen on. Everything is stored on the phone.
+
+Holding the phone sideways: the layout rotates with the phone. If rotation is
+locked, use the rotate button; the app asks the browser to rotate and, if that
+is refused, rotates the touch input instead so the cursor still follows your hand.
+
+## How it works
 
 ```
-host/
+pocketpad/
   main.py        CLI, LAN address discovery, QR banner, --usb / --hotspot
   server.py      aiohttp app: static files + /ws channel, pairing check, stuck-key release
-  protocol.py    wire format (JSON + binary motion frames), per-connection accumulators
+  protocol.py    wire format (JSON + 9-byte binary motion frames), per-connection accumulators
   smoother.py    high-rate motion smoother thread
   sysprefs.py    reads Windows Precision Touchpad preferences from the registry
   mouseaccel.py  pauses "Enhance pointer precision", reads the pointer-speed multiplier
@@ -111,64 +117,53 @@ host/
   input_win.py   SendInput via ctypes (mouse, wheel, scan-code keys, Unicode text)
   injector.py    Injector interface + FakeInjector (tests, --dry-run)
   config.py      constants, error codes, HostConfig
-web/
-  index.html, style.css      phone UI (dark graphite, amber touch ink)
-  gestures.js                touch state machine -> semantic events
-  settings.js                defaults, presets, localStorage
-  app.js                     WebSocket, ink layer, keyboard, settings sheet
-tests/                       pytest: protocol, keys/actions, HTTP + WebSocket
+  web/           the phone app: index.html, style.css, gestures.js, settings.js, app.js
+tests/           pytest: protocol, keys/actions, smoother, prefs, HTTP + WebSocket
+build_exe.py     PyInstaller one-file build
 ```
 
-Design notes:
-
-- The phone owns all preferences and sends *semantic* events
-  (`move`, `scroll`, `zoom`, `click`, `action:taskview`). The host is a dumb,
-  validated injector. This keeps the host tiny and lets each phone keep its own feel.
-- The phone owns preferences but defers to the PC's touchpad settings by default.
-- Pointer deltas are floats. The host keeps the fractional remainder so slow
-  movements are not lost to integer rounding. Same for wheel units.
-- Scroll emits small wheel deltas (smooth scrolling in Edge, Chrome, Explorer,
-  Office). "Whole notches only" batches to 120-unit notches for apps that ignore
-  partial deltas.
-- When a phone disconnects mid-drag the host releases every mouse button and
-  modifier so nothing stays stuck.
+- The phone owns look-and-feel and gesture preferences (deferring to the PC's
+  touchpad settings by default) and sends semantic events. The host is a dumb,
+  validated injector.
+- Motion goes out per touch sample as a 9-byte binary frame. The host's smoother
+  spreads each sample evenly until the next one arrives, so Wi-Fi burstiness
+  does not become cursor stutter. Sub-pixel remainders are carried, never dropped.
+- Scroll emits small wheel deltas for smooth scrolling; "Whole notches only"
+  batches to 120-unit notches for apps that ignore partial deltas.
+- A dropped connection releases every held button and modifier.
 
 ## Security
 
-- Pairing key required on the WebSocket; wrong key is closed with code 4403
-  and never reaches the injector.
+- Pairing key required on the WebSocket; a wrong key is closed with code 4403
+  before anything reaches the injector.
 - Every message is size-limited, type-checked and clamped. Unknown actions and
-  key names are rejected. Text is capped at 512 characters per message.
-- Traffic is plain HTTP on your LAN. Anyone on the same network who has the
-  key can control the mouse, so treat the key like a password and do not run
-  the host on public Wi-Fi. Bind to one interface with `--bind 192.168.1.36`.
+  key names are rejected. Text is capped per message.
+- Traffic is plain HTTP on your LAN. Anyone on the same network who has the key
+  can control the mouse, so treat the key like a password and do not run the
+  host on public Wi-Fi. `--bind 192.168.1.36` limits it to one interface.
 
-## Testing
+## Development
 
 ```
-pip install -r requirements.txt
-python -m pytest -q
+pip install -e .[dev]
+python -m pytest -q        # 33 tests
+python build_exe.py        # dist/PocketPad.exe
 ```
 
-33 tests cover the protocol (accumulators, clamps, rejections), the key table
-and action catalog, and the HTTP + WebSocket server with a fake injector.
 Gesture recognition was verified in an emulated Pixel 7 (Playwright + Chrome
-DevTools touch events) for move, tap, two-finger tap, scroll, pinch, three
-and four finger swipes with repeat, and double-tap drag. Run the host with
-`--dry-run` to log injected events without moving anything.
+DevTools touch events) for move, tap, two-finger tap, scroll, pinch, three and
+four finger swipes, the live app switcher, double-tap drag, the scroll strip and
+orientation rotation. `--dry-run` logs injected events without moving anything.
+CI runs the tests and builds the exe on every push; a `v*` tag publishes a release.
 
-No caching layer exists; `index.html` is served with `Cache-Control: no-cache`
-so phones always pick up host updates.
+## Known limits
 
-## Known limits and next steps
-
-- This is input synthesis, not a real Precision Touchpad. Windows does not
-  list PocketPad under Touchpad settings, and apps that read raw touchpad
-  contacts (Pad2Screen style tools) will not see it. Getting there needs a
-  virtual HID driver (UMDF VHF) with a signed package, which is the v2 path.
+- This is input synthesis, not a real Precision Touchpad. Windows does not list
+  PocketPad under Touchpad settings. A virtual HID driver (UMDF VHF, signed)
+  would be the way to change that.
+- Windows only writes a gesture preference to the registry once it has been
+  changed from default, so the custom per-direction numbering is best effort
+  until verified against a PC that has customised them.
 - Android Chrome gives fullscreen; iOS Safari only via Add to Home Screen.
-- Latency is typically 5 to 20 ms on a normal home network; the top bar shows
-  the live round-trip time.
-- Ideas queued: a tray icon and autostart for the host, mDNS so the phone can
-  find the laptop without a QR, USB tethering mode for zero-latency wired use,
-  a single-file `.exe` build with PyInstaller.
+
+MIT licence.

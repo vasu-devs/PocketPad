@@ -3,13 +3,24 @@ from __future__ import annotations
 
 import os
 import secrets
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 APP_NAME = "PocketPad"
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
-WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+def _web_dir() -> Path:
+    # PyInstaller one-file builds unpack data next to sys._MEIPASS.
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+    for cand in (base / "pocketpad" / "web", Path(__file__).resolve().parent / "web"):
+        if cand.is_dir():
+            return cand
+    return Path(__file__).resolve().parent / "web"
+
+
+WEB_DIR = _web_dir()
 
 DEFAULT_PORT = 8765
 DEFAULT_BIND = "0.0.0.0"

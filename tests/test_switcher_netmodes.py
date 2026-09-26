@@ -1,8 +1,8 @@
 import pytest
 
-from host import netmodes
-from host.injector import FakeInjector
-from host.protocol import ProtocolError, Session
+from pocketpad import netmodes
+from pocketpad.injector import FakeInjector
+from pocketpad.protocol import ProtocolError, Session
 
 
 def test_switcher_holds_alt_until_end():

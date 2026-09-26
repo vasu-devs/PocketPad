@@ -4,15 +4,15 @@ import pytest
 from aiohttp import WSMsgType
 from aiohttp.test_utils import TestClient, TestServer
 
-from host.config import HostConfig
-from host.injector import FakeInjector
-from host.server import WS_CLOSE_BAD_KEY, create_app
+from pocketpad.config import HostConfig
+from pocketpad.injector import FakeInjector
+from pocketpad.server import WS_CLOSE_BAD_KEY, create_app
 
 
 @pytest.fixture(autouse=True)
 def unit_pointer_speed(monkeypatch):
     # The real machine's pointer-speed slider must not leak into the assertions.
-    monkeypatch.setattr("host.server.pointer_multiplier", lambda: 1.0)
+    monkeypatch.setattr("pocketpad.server.pointer_multiplier", lambda: 1.0)
 
 
 @pytest.fixture

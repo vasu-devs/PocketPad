@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from host.injector import FakeInjector
-from host.protocol import ProtocolError, Session
+from pocketpad.injector import FakeInjector
+from pocketpad.protocol import ProtocolError, Session
 
 
 @pytest.fixture

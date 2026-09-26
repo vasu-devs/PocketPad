@@ -3,10 +3,10 @@ import time
 
 import pytest
 
-from host import sysprefs
-from host.injector import FakeInjector
-from host.protocol import ProtocolError, Session
-from host.smoother import MotionSmoother
+from pocketpad import sysprefs
+from pocketpad.injector import FakeInjector
+from pocketpad.protocol import ProtocolError, Session
+from pocketpad.smoother import MotionSmoother
 
 
 def test_smoother_delivers_everything_eventually():
@@ -91,6 +91,6 @@ def test_session_gain_scales_moves():
 
 
 def test_pointer_multiplier_table():
-    from host.mouseaccel import POINTER_SPEED_MULT
+    from pocketpad.mouseaccel import POINTER_SPEED_MULT
     assert POINTER_SPEED_MULT[10] == 1.0 and POINTER_SPEED_MULT[20] == 3.5
     assert len(POINTER_SPEED_MULT) == 20
