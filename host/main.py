@@ -15,6 +15,8 @@ from aiohttp import web
 
 from .config import APP_NAME, VERSION, HostConfig
 from .injector import FakeInjector
+from .mouseaccel import MouseAccelGuard
+from .netmodes import setup_usb, start_hotspot
 from .server import create_app
 
 log = logging.getLogger("pocketpad")
@@ -82,6 +84,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--key", help="fixed pairing key instead of a random one")
     p.add_argument("--log-level", help="DEBUG, INFO, WARNING")
     p.add_argument("--dry-run", action="store_true", help="log input events instead of injecting")
+    p.add_argument("--usb", action="store_true", help="Android USB mode via adb reverse (no Wi-Fi needed)")
+    p.add_argument("--hotspot", action="store_true", help="turn on Windows Mobile Hotspot for a direct link")
+    p.add_argument("--no-smoothing", action="store_true", help="inject deltas as they arrive (raw)")
+    p.add_argument("--keep-mouse-accel", action="store_true",
+                   help="do not pause 'Enhance pointer precision' while running")
     args = p.parse_args(argv)
     config = HostConfig.from_env_and_args(args)
 
@@ -98,7 +105,22 @@ def main(argv: list[str] | None = None) -> int:
 
     app = create_app(config, injector)
     _banner(config)
-    web.run_app(app, host=config.bind, port=config.port, print=None, access_log=None)
+
+    if args.hotspot:
+        ok, msg = start_hotspot()
+        print("  " + msg + "\n")
+    if args.usb:
+        ok, msg = setup_usb(config.port)
+        print("  " + msg + (f"?k={config.key}" if ok else "") + "\n")
+
+    guard = MouseAccelGuard()
+    if not args.keep_mouse_accel and not args.dry_run:
+        if guard.disable():
+            print("  'Enhance pointer precision' is paused until you close PocketPad.\n")
+    try:
+        web.run_app(app, host=config.bind, port=config.port, print=None, access_log=None)
+    finally:
+        guard.restore()
     return 0
 
 

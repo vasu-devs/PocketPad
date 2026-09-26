@@ -10,7 +10,10 @@ from aiohttp import WSMsgType, web
 from . import actions
 from .config import APP_NAME, VERSION, ErrorCode, HostConfig
 from .injector import Injector
+from .mouseaccel import pointer_multiplier
 from .protocol import ProtocolError, Session
+from .smoother import MotionSmoother
+from .sysprefs import read_touchpad_prefs
 
 log = logging.getLogger(__name__)
 
@@ -60,13 +63,25 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
         log.warning("%s rejected connection from %s (wrong key)", ErrorCode.BAD_KEY, peer)
         await ws.close(code=WS_CLOSE_BAD_KEY, message=b"wrong pairing key")
         return ws
-    session = Session(request.app[INJECTOR_KEY])
+    injector = request.app[INJECTOR_KEY]
+    smoother = MotionSmoother(injector) if request.app[CONFIG_KEY].smoothing else None
+    # Injected motion is scaled by the Windows mouse pointer-speed slider; cancel that
+    # so the phone's speed setting means the same thing on every PC.
+    session = Session(injector, smoother=smoother, gain=1.0 / pointer_multiplier())
     log.info("phone connected from %s", peer)
     await ws.send_str(json.dumps({"t": "hello", "app": APP_NAME, "version": VERSION,
-                                  "actions": actions.catalog()}))
+                                  "actions": actions.catalog(),
+                                  "system": read_touchpad_prefs()}))
     bad = 0
     try:
         async for msg in ws:
+            if msg.type == WSMsgType.BINARY:
+                try:
+                    session.handle_binary(msg.data)
+                except ProtocolError as e:
+                    bad += 1
+                    log.warning("%s bad binary frame from %s: %s", ErrorCode.BAD_MESSAGE, peer, e)
+                continue
             if msg.type != WSMsgType.TEXT:
                 if msg.type == WSMsgType.ERROR:
                     log.error("%s websocket error: %s", ErrorCode.SERVER_FAIL, ws.exception())
@@ -83,6 +98,7 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
             if reply is not None:
                 await ws.send_str(json.dumps(reply))
     finally:
+        session.close()
         # Never leave a button or modifier stuck if the phone drops mid-drag.
         inj = request.app[INJECTOR_KEY]
         for b in ("left", "right", "middle"):

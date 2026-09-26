@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0f1113">
+<meta name="theme-color" content="#0b0c0e">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -11,48 +11,57 @@
 <title>PocketPad</title>
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="/static/manifest.webmanifest">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap">
+<link rel="preload" href="/static/assets/space-grotesk.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-<header class="bar" id="topbar">
-  <span class="brand">PocketPad</span>
-  <span class="status" id="status" aria-live="polite">Connecting</span>
-  <div class="bar-actions">
-    <button class="bar-btn" id="kbd-btn" type="button" aria-label="Type on the PC">Aa</button>
-    <button class="bar-btn" id="settings-btn" type="button" aria-label="Settings">&#8801;</button>
-  </div>
-</header>
-
-<main class="surface" id="surface" aria-label="Touch surface">
+<main class="pad" id="surface" aria-label="Touch surface">
   <canvas id="ink"></canvas>
-  <p class="hint" id="hint">One finger moves. Two scroll. Three and four swipe.</p>
+  <p class="hint" id="hint">Move with one finger. Scroll with two.<br>Three and four fingers swipe, like your laptop.</p>
 </main>
 
 <nav class="buttons" id="buttons" hidden>
-  <button class="mbtn" data-btn="left" type="button">Left</button>
-  <button class="mbtn" data-btn="right" type="button">Right</button>
+  <button class="mbtn" data-btn="left" type="button" aria-label="Left button"></button>
+  <button class="mbtn" data-btn="right" type="button" aria-label="Right button"></button>
 </nav>
+
+<footer class="dock">
+  <button class="dock-btn" id="kbd-btn" type="button" aria-label="Type on the PC"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48Zm0,144H32V64H224V192Zm-16-64a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,128Zm0-32a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,96ZM72,160a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16h8A8,8,0,0,1,72,160Zm96,0a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,160Zm40,0a8,8,0,0,1-8,8h-8a8,8,0,0,1,0-16h8A8,8,0,0,1,208,160Z"/></svg></button>
+  <div class="dock-status">
+    <span class="dock-name">PocketPad</span>
+    <span class="dock-state" id="status" aria-live="polite">Connecting</span>
+  </div>
+  <button class="dock-btn" id="settings-btn" type="button" aria-label="Settings"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24A16,16,0,1,1,88,80,16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/></svg></button>
+</footer>
 
 <textarea id="typer" class="typer" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Text goes to the PC"> </textarea>
 
 <div class="overlay" id="overlay">
   <div class="overlay-card">
-    <p class="overlay-title" id="overlay-title">Connecting to your PC</p>
-    <p class="overlay-body" id="overlay-body">Make sure the phone and the laptop are on the same Wi-Fi and the host is running.</p>
-    <button class="btn" id="retry-btn" type="button">Try again</button>
+    <p class="overlay-title" id="overlay-title">Looking for your PC</p>
+    <p class="overlay-body" id="overlay-body">Keep the host window open on the laptop. Phone and laptop need to be on the same network, or plugged in over USB.</p>
+    <button class="btn" id="retry-btn" type="button"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M88,104H40a8,8,0,0,1-8-8V48a8,8,0,0,1,16,0V76.69L62.63,62.06A95.43,95.43,0,0,1,130,33.94h.53a95.36,95.36,0,0,1,67.07,27.33,8,8,0,0,1-11.18,11.44,79.52,79.52,0,0,0-55.89-22.77h-.45A79.56,79.56,0,0,0,73.94,73.37L59.31,88H88a8,8,0,0,1,0,16Zm128,48H168a8,8,0,0,0,0,16h28.69l-14.63,14.63a79.56,79.56,0,0,1-56.13,23.43h-.45a79.52,79.52,0,0,1-55.89-22.77,8,8,0,1,0-11.18,11.44,95.36,95.36,0,0,0,67.07,27.33H126a95.43,95.43,0,0,0,67.36-28.12L208,179.31V208a8,8,0,0,0,16,0V160A8,8,0,0,0,216,152Z"/></svg><span>Try again</span></button>
   </div>
 </div>
 
 <section class="sheet" id="sheet" aria-label="Settings" hidden>
-  <div class="sheet-head">
+  <header class="sheet-head">
     <h2>Settings</h2>
-    <button class="bar-btn" id="sheet-close" type="button" aria-label="Close settings">&times;</button>
-  </div>
+    <button class="dock-btn" id="sheet-close" type="button" aria-label="Close settings"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg></button>
+  </header>
   <div class="sheet-body" id="sheet-body"></div>
 </section>
+
+<section class="picker" id="picker" hidden>
+  <header class="picker-head">
+    <h3 id="picker-title">Choose</h3>
+    <button class="dock-btn" id="picker-close" type="button" aria-label="Close"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg></button>
+  </header>
+  <div class="picker-list" id="picker-list" role="listbox"></div>
+</section>
+
+<template id="tpl-check"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg></template>
 
 <script src="/static/settings.js"></script>
 <script src="/static/gestures.js"></script>

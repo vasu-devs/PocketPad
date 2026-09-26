@@ -9,10 +9,16 @@ from host.injector import FakeInjector
 from host.server import WS_CLOSE_BAD_KEY, create_app
 
 
+@pytest.fixture(autouse=True)
+def unit_pointer_speed(monkeypatch):
+    # The real machine's pointer-speed slider must not leak into the assertions.
+    monkeypatch.setattr("host.server.pointer_multiplier", lambda: 1.0)
+
+
 @pytest.fixture
 async def client():
     inj = FakeInjector()
-    app = create_app(HostConfig(key="424242"), inj)
+    app = create_app(HostConfig(key="424242", smoothing=False), inj)
     async with TestClient(TestServer(app)) as c:
         c.injector = inj
         yield c
@@ -39,6 +45,7 @@ async def test_ws_roundtrip(client):
     ws = await client.ws_connect("/ws?k=424242")
     hello = json.loads((await ws.receive()).data)
     assert hello["t"] == "hello" and hello["actions"]
+    assert "cursorSpeed" in hello["system"] and "threeSlide" in hello["system"]
     await ws.send_str(json.dumps({"t": "m", "x": 3, "y": 4}))
     await ws.send_str(json.dumps({"t": "ping", "id": 1}))
     pong = json.loads((await ws.receive()).data)
@@ -53,3 +60,18 @@ async def test_ws_roundtrip(client):
     await ws.close()
     await client.server.app.shutdown()
     assert ("button", "left", False) in client.injector.calls
+
+
+async def test_ws_binary_frames_with_smoothing():
+    import struct
+    inj = FakeInjector()
+    app = create_app(HostConfig(key="1"), inj)
+    async with TestClient(TestServer(app)) as c:
+        ws = await c.ws_connect("/ws?k=1")
+        await ws.receive()
+        await ws.send_bytes(struct.pack("<Bff", 1, 12.0, 0.0))
+        await ws.send_bytes(bytes([3]))
+        await ws.send_str(json.dumps({"t": "ping", "id": 1}))
+        await ws.receive()
+        await ws.close()
+    assert sum(cl[1] for cl in inj.calls if cl[0] == "move") == 12

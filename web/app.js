@@ -1,35 +1,29 @@
-/* PocketPad phone app: connection, ink layer, buttons, keyboard, settings sheet. */
+/* PocketPad phone app: connection, ink, dock, keyboard, settings sheet, picker. */
 (function () {
   'use strict';
 
   const $ = id => document.getElementById(id);
   const S = window.PocketSettings;
-  let settings = S.load();
+  let user = S.load();          // what this phone stores
+  let system = null;            // what the PC reports
+  let eff = S.effective(user, system);
   let actionsCatalog = [];
 
   // ------------------------------------------------------------ connection
   const key = new URLSearchParams(location.search).get('k') || '';
   const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?k=' + encodeURIComponent(key);
-  let ws = null, retryTimer = 0, pingTimer = 0, latency = null, lastPingId = 0, lastPingAt = 0;
-
+  let ws = null, retryTimer = 0, pingTimer = 0, lastPingId = 0, lastPingAt = 0;
   const statusEl = $('status'), overlay = $('overlay');
 
-  function setStatus(text, ok) {
-    statusEl.textContent = text;
-    statusEl.classList.toggle('ok', !!ok);
-  }
-
-  function showOverlay(title, body) {
-    $('overlay-title').textContent = title;
-    $('overlay-body').textContent = body;
-    overlay.hidden = false;
-  }
+  function setStatus(text, ok) { statusEl.textContent = text; statusEl.classList.toggle('ok', !!ok); }
+  function showOverlay(title, body) { $('overlay-title').textContent = title; $('overlay-body').textContent = body; overlay.hidden = false; }
 
   function connect() {
     clearTimeout(retryTimer);
-    if (ws) { try { ws.close(); } catch (e) { /* ignore */ } }
+    if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* ignore */ } }
     setStatus('Connecting', false);
     ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
     ws.onopen = () => {
       overlay.hidden = true;
       setStatus('Connected', true);
@@ -39,19 +33,20 @@
       ping();
     };
     ws.onmessage = ev => {
+      if (typeof ev.data !== 'string') return;
       let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
-      if (msg.t === 'hello' && Array.isArray(msg.actions)) {
-        actionsCatalog = msg.actions;
+      if (msg.t === 'hello') {
+        if (Array.isArray(msg.actions)) actionsCatalog = msg.actions;
+        if (msg.system) { system = msg.system; recompute(); }
         if (!$('sheet').hidden) renderSheet();
       } else if (msg.t === 'pong' && msg.id === lastPingId) {
-        latency = Math.round(performance.now() - lastPingAt);
-        setStatus('Connected, ' + latency + ' ms', true);
+        setStatus(Math.round(performance.now() - lastPingAt) + ' ms', true);
       }
     };
     ws.onclose = ev => {
       clearInterval(pingTimer);
-      if (ev.code === 1008 || ev.code === 4403) {
-        showOverlay('Wrong pairing key', 'Scan the QR code shown by the host again. The key changes every time the host starts.');
+      if (ev.code === 4403) {
+        showOverlay('Wrong pairing key', 'Scan the QR code from the host again. The key changes each time the host starts.');
         setStatus('Not paired', false);
         return;
       }
@@ -59,33 +54,27 @@
       showOverlay('Lost the PC', 'Reconnecting. Check the host window on the laptop is still open.');
       retryTimer = setTimeout(connect, 1500);
     };
-    ws.onerror = () => { /* onclose follows */ };
   }
 
-  function send(obj) {
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+  const bin = new ArrayBuffer(9), binView = new DataView(bin);
+  const binEnd = new Uint8Array([3]);
+  function sendDelta(kind, dx, dy) {
+    if (!ws || ws.readyState !== 1) return;
+    binView.setUint8(0, kind); binView.setFloat32(1, dx, true); binView.setFloat32(5, dy, true);
+    ws.send(bin);
   }
 
-  function ping() {
-    lastPingId += 1; lastPingAt = performance.now();
-    send({ t: 'ping', id: lastPingId });
-  }
-
-  function sendCfg() {
-    send({ t: 'cfg', scroll: 1, natural: settings.natural, notched: settings.notched });
-  }
-
+  function ping() { lastPingId += 1; lastPingAt = performance.now(); send({ t: 'ping', id: lastPingId }); }
+  function sendCfg() { send({ t: 'cfg', scroll: 1, natural: eff.natural, notched: eff.notched }); }
   $('retry-btn').addEventListener('click', connect);
 
-  // ------------------------------------------------------------ haptics
-  function buzz(ms) {
-    if (settings.haptics && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) { /* ignore */ } }
-  }
+  function buzz(ms) { if (eff.haptics && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) { /* ignore */ } } }
 
   // ------------------------------------------------------------ ink layer
   const canvas = $('ink'), ctx = canvas.getContext('2d');
   let contacts = [], trail = [], inkRaf = 0;
-
   function resizeCanvas() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const r = canvas.getBoundingClientRect();
@@ -99,40 +88,40 @@
     inkRaf = 0;
     const r = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, r.width, r.height);
-    if (!settings.ink) return;
+    if (!eff.ink) return;
     const now = performance.now();
-    trail = trail.filter(p => now - p.t < 420);
+    trail = trail.filter(p => now - p.t < 380);
+    ctx.lineWidth = 1.25;
     for (const p of trail) {
-      const a = 1 - (now - p.t) / 420;
-      ctx.beginPath(); ctx.arc(p.x - r.left, p.y - r.top, 6 + 10 * (1 - a), 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(242,180,65,' + (0.35 * a).toFixed(3) + ')'; ctx.lineWidth = 1.5; ctx.stroke();
+      const a = 1 - (now - p.t) / 380;
+      ctx.beginPath(); ctx.arc(p.x - r.left, p.y - r.top, 5 + 9 * (1 - a), 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(240,178,60,' + (0.3 * a).toFixed(3) + ')'; ctx.stroke();
     }
     for (const c of contacts) {
-      ctx.beginPath(); ctx.arc(c.x - r.left, c.y - r.top, 22, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(242,180,65,0.14)'; ctx.fill();
-      ctx.beginPath(); ctx.arc(c.x - r.left, c.y - r.top, 22, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(242,180,65,0.9)'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(c.x - r.left, c.y - r.top, 18, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(240,178,60,0.12)'; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(240,178,60,0.85)'; ctx.stroke();
     }
     if (contacts.length || trail.length) inkRaf = requestAnimationFrame(drawInk);
   }
-
   function setContacts(list) {
-    if (!settings.ink) return;
+    if (!eff.ink) return;
     const now = performance.now();
     for (const c of list) trail.push({ x: c.x, y: c.y, t: now });
-    if (trail.length > 400) trail.splice(0, trail.length - 400);
+    if (trail.length > 300) trail.splice(0, trail.length - 300);
     contacts = list;
     if (!inkRaf) inkRaf = requestAnimationFrame(drawInk);
   }
 
-  // ------------------------------------------------------------ gesture sink
+  // ------------------------------------------------------------ gestures
   const hint = $('hint');
   let hinted = false;
   function hideHint() { if (!hinted) { hinted = true; hint.classList.add('gone'); } }
 
   const sink = {
-    move(dx, dy) { hideHint(); send({ t: 'm', x: +dx.toFixed(2), y: +dy.toFixed(2) }); },
-    scroll(dx, dy) { hideHint(); send({ t: 's', x: +dx.toFixed(2), y: +dy.toFixed(2) }); },
+    move(dx, dy) { hideHint(); sendDelta(1, dx, dy); },
+    moveEnd() { if (ws && ws.readyState === 1) ws.send(binEnd); },
+    scroll(dx, dy) { hideHint(); sendDelta(2, dx, dy); },
     scrollEnd() { send({ t: 'se' }); },
     zoom(d) { send({ t: 'z', d }); buzz(6); },
     click(b, n) { hideHint(); send({ t: 'c', b, n }); buzz(8); },
@@ -140,18 +129,16 @@
     action(a) { send({ t: 'a', a }); buzz(14); },
     contacts: setContacts,
   };
-
   const surface = $('surface');
-  new window.GestureEngine(surface, sink, () => settings);
+  new window.GestureEngine(surface, sink, () => eff);
 
-  // Fullscreen on the first real touch (Android). iPhones use Add to Home Screen.
   surface.addEventListener('touchend', function goFull() {
     surface.removeEventListener('touchend', goFull);
     const el = document.documentElement;
     if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => { /* fine */ });
   });
 
-  // ------------------------------------------------------------ on-screen buttons
+  // ------------------------------------------------------------ physical buttons
   const buttonsEl = $('buttons');
   for (const btn of buttonsEl.querySelectorAll('.mbtn')) {
     const b = btn.dataset.btn;
@@ -161,31 +148,24 @@
     btn.addEventListener('touchcancel', up, { passive: false });
   }
 
-  // ------------------------------------------------------------ keyboard typing
+  // ------------------------------------------------------------ keyboard
   const typer = $('typer'), kbdBtn = $('kbd-btn');
   const SENTINEL = ' ';
   typer.value = SENTINEL;
   kbdBtn.addEventListener('click', () => {
-    if (document.activeElement === typer) { typer.blur(); }
-    else { typer.focus(); typer.setSelectionRange(typer.value.length, typer.value.length); }
+    if (document.activeElement === typer) typer.blur();
+    else { typer.focus(); typer.setSelectionRange(1, 1); }
   });
   typer.addEventListener('focus', () => kbdBtn.classList.add('on'));
   typer.addEventListener('blur', () => kbdBtn.classList.remove('on'));
   typer.addEventListener('beforeinput', e => {
-    if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') {
-      e.preventDefault(); send({ t: 'k', k: 'enter' });
-    }
+    if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') { e.preventDefault(); send({ t: 'k', k: 'enter' }); }
   });
   typer.addEventListener('input', () => {
     const v = typer.value;
-    if (v.length < SENTINEL.length) {
-      send({ t: 'k', k: 'backspace' });
-    } else if (v.length > SENTINEL.length) {
-      const typed = v.slice(SENTINEL.length);
-      if (typed) send({ t: 'txt', s: typed });
-    }
-    typer.value = SENTINEL;
-    typer.setSelectionRange(1, 1);
+    if (v.length < SENTINEL.length) send({ t: 'k', k: 'backspace' });
+    else if (v.length > SENTINEL.length) { const typed = v.slice(SENTINEL.length); if (typed) send({ t: 'txt', s: typed }); }
+    typer.value = SENTINEL; typer.setSelectionRange(1, 1);
   });
   typer.addEventListener('keydown', e => {
     const map = { Tab: 'tab', Escape: 'esc', ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Delete: 'delete' };
@@ -193,132 +173,162 @@
   });
 
   // ------------------------------------------------------------ keep awake
-  let wakeLock = null;
   async function keepAwake() {
-    if (!settings.keepAwake || !('wakeLock' in navigator)) return;
-    try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { wakeLock = null; }
+    if (!eff.keepAwake || !('wakeLock' in navigator)) return;
+    try { await navigator.wakeLock.request('screen'); } catch (e) { /* not granted */ }
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
   keepAwake();
 
-  // ------------------------------------------------------------ settings sheet
-  const sheet = $('sheet'), body = $('sheet-body');
-  $('settings-btn').addEventListener('click', () => { renderSheet(); sheet.hidden = false; });
-  $('sheet-close').addEventListener('click', () => { sheet.hidden = true; });
-
-  function update(patch) {
-    settings = Object.assign({}, settings, patch);
-    S.save(settings);
-    apply();
-  }
-
-  function apply() {
-    buttonsEl.hidden = !settings.buttons;
+  // ------------------------------------------------------------ settings state
+  function recompute() {
+    eff = S.effective(user, system);
+    buttonsEl.hidden = !eff.buttons;
     sendCfg();
-    if (!settings.ink) { contacts = []; trail = []; drawInk(); }
+    if (!eff.ink) { contacts = []; trail = []; drawInk(); }
     resizeCanvas();
   }
-  apply();
+  function update(patch) { user = Object.assign({}, user, patch); S.save(user); recompute(); }
+  recompute();
 
-  function tapOptions(n) {
-    const clicks = [['leftclick', 'Left click'], ['rightclick', 'Right click'], ['middleclick', 'Middle click']];
-    const rest = actionsCatalog.filter(a => !['leftclick', 'rightclick', 'middleclick'].includes(a.name))
-      .map(a => [a.name, a.label]);
-    return clicks.concat(rest.length ? rest : [['none', 'Nothing']]);
-  }
-
-  function swipeOptions() {
-    const list = actionsCatalog.length ? actionsCatalog.map(a => [a.name, a.label]) : [['none', 'Nothing']];
-    return list;
-  }
-
+  // ------------------------------------------------------------ DOM helpers
+  const checkIcon = () => $('tpl-check').content.firstElementChild.cloneNode(true);
   function el(tag, attrs, children) {
     const e = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
-      if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
+      if (k === 'text') e.textContent = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else if (v === false || v == null) continue;
+      else e.setAttribute(k, v === true ? '' : v);
     }
-    for (const c of children || []) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    for (const c of children || []) if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
     return e;
   }
+  const labelOf = name => {
+    if (name === 'leftclick') return 'Left click';
+    if (name === 'rightclick') return 'Right click';
+    if (name === 'middleclick') return 'Middle click';
+    if (typeof name === 'string' && name.startsWith('keys:')) return 'Shortcut ' + name.slice(5);
+    const a = actionsCatalog.find(x => x.name === name);
+    return a ? a.label : (name === 'none' ? 'Nothing' : String(name));
+  };
+  const synced = k => eff.synced && eff.synced.includes(k);
+  const tagPC = k => synced(k) ? el('span', { class: 'tag', text: 'PC' }) : null;
 
-  function group(title, rows) { return el('div', { class: 'group' }, [el('h3', { text: title })].concat(rows)); }
-
-  function slider(label, sub, k, min, max, step, fmt) {
-    const val = el('span', { class: 'val', text: fmt(settings[k]) });
-    const input = el('input', { type: 'range', min, max, step, value: settings[k],
-      oninput: e => { val.textContent = fmt(+e.target.value); },
-      onchange: e => update({ [k]: +e.target.value }) });
-    return el('div', { class: 'row' }, [el('label', {}, [label, el('span', { class: 'sub', text: sub })]), input, val]);
+  function lbl(title, sub, k) {
+    return el('div', { class: 'lbl' }, [el('b', {}, [title, tagPC(k)]), sub ? el('small', { text: sub }) : null]);
+  }
+  function group(title, rows) {
+    return el('div', {}, [el('p', { class: 'group-title', text: title }), el('div', { class: 'group' }, rows)]);
+  }
+  function toggle(title, sub, k) {
+    const dis = synced(k);
+    const sw = el('button', { class: 'switch', role: 'switch', 'aria-checked': String(!!eff[k]), 'aria-label': title, disabled: dis,
+      onclick: () => { update({ [k]: !user[k] }); sw.setAttribute('aria-checked', String(!!eff[k])); } });
+    return el('div', { class: 'row' }, [lbl(title, sub, k), sw]);
+  }
+  function slider(title, sub, k, min, max, step, fmt) {
+    const dis = synced(k);
+    const val = el('span', { class: 'val', text: fmt(eff[k]) });
+    const input = el('input', { type: 'range', min, max, step, value: eff[k], disabled: dis, 'aria-label': title });
+    const paint = () => input.style.setProperty('--pct', ((input.value - min) / (max - min) * 100) + '%');
+    input.addEventListener('input', () => { val.textContent = fmt(+input.value); paint(); });
+    input.addEventListener('change', () => update({ [k]: +input.value }));
+    paint();
+    return el('div', { class: 'row' }, [el('div', { class: 'slider' }, [
+      el('div', { class: 'slider-top' }, [lbl(title, sub, k), val]), input])]);
+  }
+  function choice(title, k, current, options, onpick) {
+    const dis = synced(k);
+    const btn = el('button', { class: 'vbtn', disabled: dis, onclick: () => openPicker(title, current, options, onpick) },
+      [el('span', { text: labelOf(current) })]);
+    return el('div', { class: 'row' }, [lbl(title, null, k), btn]);
   }
 
-  function toggle(label, sub, k) {
-    const sw = el('button', { class: 'switch', role: 'switch', 'aria-checked': String(!!settings[k]), 'aria-label': label,
-      onclick: () => { update({ [k]: !settings[k] }); sw.setAttribute('aria-checked', String(!!settings[k])); } });
-    return el('div', { class: 'row' }, [el('label', {}, [label, el('span', { class: 'sub', text: sub })]), sw]);
+  // ------------------------------------------------------------ picker
+  const picker = $('picker'), pickerList = $('picker-list');
+  function openPicker(title, current, options, onpick) {
+    $('picker-title').textContent = title;
+    pickerList.textContent = '';
+    for (const [value, text] of options) {
+      pickerList.appendChild(el('button', { class: 'opt' + (value === current ? ' on' : ''), role: 'option', 'aria-selected': String(value === current),
+        onclick: () => { picker.hidden = true; onpick(value); renderSheet(); } }, [el('span', { text }), checkIcon()]));
+    }
+    picker.hidden = false;
   }
+  $('picker-close').addEventListener('click', () => { picker.hidden = true; });
 
-  function select(label, current, options, onchange) {
-    const sel = el('select', { onchange: e => onchange(e.target.value) },
-      options.map(([v, t]) => el('option', { value: v, text: t })));
-    if (!options.some(([v]) => v === current)) sel.appendChild(el('option', { value: current, text: current }));
-    sel.value = current;
-    return el('div', { class: 'row' }, [el('label', { text: label }), sel]);
+  const clickOptions = [['leftclick', 'Left click'], ['rightclick', 'Right click'], ['middleclick', 'Middle click']];
+  function tapOptions() {
+    const rest = actionsCatalog.filter(a => !['leftclick', 'rightclick', 'middleclick'].includes(a.name)).map(a => [a.name, a.label]);
+    return clickOptions.concat(rest.length ? rest : [['none', 'Nothing']]);
+  }
+  function swipeOptions() { return actionsCatalog.length ? actionsCatalog.map(a => [a.name, a.label]) : [['none', 'Nothing']]; }
+
+  // ------------------------------------------------------------ sheet
+  const sheet = $('sheet'), body = $('sheet-body');
+  $('settings-btn').addEventListener('click', () => { renderSheet(); sheet.hidden = false; });
+  $('sheet-close').addEventListener('click', () => { sheet.hidden = true; picker.hidden = true; });
+
+  function matchBlock() {
+    const sw = el('button', { class: 'switch', role: 'switch', 'aria-checked': String(!!user.matchPC), 'aria-label': 'Match this PC',
+      onclick: () => { update({ matchPC: !user.matchPC }); renderSheet(); } });
+    const desc = user.matchPC ? S.describeSystem(system) : 'Off. Using the settings below.';
+    return el('div', { class: 'match' }, [el('div', { class: 'lbl' }, [el('b', { text: 'Match this PC’s touchpad' }), el('small', { text: desc })]), sw]);
   }
 
   function swipeGroup(title, k) {
-    const map = settings[k];
+    const map = eff[k];
     const current = S.presetOf(map);
-    const chips = el('div', { class: 'presets' }, Object.entries(S.SWIPE_PRESETS).map(([name, p]) =>
-      el('button', { class: 'chip' + (current === name ? ' on' : ''), text: p.label,
+    const dis = synced(k);
+    const segs = el('div', { class: 'segs' }, Object.entries(S.SWIPE_PRESETS).map(([name, p]) =>
+      el('button', { class: 'seg' + (current === name ? ' on' : ''), text: p.label, disabled: dis,
         onclick: () => { update({ [k]: Object.assign({}, p.map) }); renderSheet(); } })));
     const dirs = el('div', { class: 'dirs' }, ['up', 'down', 'left', 'right'].map(d =>
-      select(d[0].toUpperCase() + d.slice(1), map[d], swipeOptions(), v => {
-        update({ [k]: Object.assign({}, settings[k], { [d]: v }) }); renderSheet();
-      })));
-    const custom = el('input', { class: 'custom', placeholder: 'Custom shortcut for Up, e.g. ctrl+shift+t', 'aria-label': 'Custom shortcut',
-      onchange: e => { const v = e.target.value.trim(); if (v) { update({ [k]: Object.assign({}, settings[k], { up: 'keys:' + v }) }); renderSheet(); } } });
-    return group(title, [chips, dirs, custom,
-      el('p', { class: 'note', text: 'Left and right repeat while your fingers keep moving, so you can step through apps or desktops in one swipe.' })]);
+      choice(d[0].toUpperCase() + d.slice(1), k, map[d], swipeOptions(), v => update({ [k]: Object.assign({}, user[k], { [d]: v }) }))));
+    const custom = dis ? null : el('input', { class: 'textfield', placeholder: 'Shortcut for Up, e.g. ctrl+shift+t', 'aria-label': 'Custom shortcut',
+      onchange: e => { const v = e.target.value.trim(); if (v) { update({ [k]: Object.assign({}, user[k], { up: 'keys:' + v }) }); renderSheet(); } } });
+    return group(title, [segs, dirs, custom]);
   }
 
   function renderSheet() {
     body.textContent = '';
+    body.appendChild(matchBlock());
     body.appendChild(group('Pointer', [
-      slider('Speed', 'How far the cursor travels', 'speed', 0.4, 4, 0.1, v => v.toFixed(1) + 'x'),
+      slider('Speed', null, 'speed', 0.25, 3.5, 0.05, v => v.toFixed(2) + '×'),
       slider('Acceleration', 'Fast flicks travel further', 'accel', 0, 1, 0.05, v => Math.round(v * 100) + '%'),
-      toggle('Double tap to drag', 'Tap, then tap and hold to drag', 'dragOnDoubleTap'),
+      toggle('Double tap to drag', 'Tap, then tap and hold', 'dragOnDoubleTap'),
       toggle('Three finger drag', 'Replaces three finger swipes', 'threeFingerDrag'),
     ]));
     body.appendChild(group('Scroll and zoom', [
-      slider('Scroll speed', 'Two fingers', 'scroll', 0.3, 3, 0.1, v => v.toFixed(1) + 'x'),
+      toggle('Two finger scroll', null, 'pan'),
+      slider('Scroll speed', null, 'scroll', 0.3, 3, 0.1, v => v.toFixed(1) + '×'),
       toggle('Natural scrolling', 'Content follows your fingers', 'natural'),
+      toggle('Pinch to zoom', null, 'zoom'),
       toggle('Whole notches only', 'For apps that ignore smooth scrolling', 'notched'),
-      el('p', { class: 'note', text: 'Pinch with two fingers to zoom. Works anywhere Ctrl plus wheel does.' }),
     ]));
     body.appendChild(group('Taps', [
-      select('One finger', settings.tap1, tapOptions(1), v => update({ tap1: v })),
-      select('Two fingers', settings.tap2, tapOptions(2), v => update({ tap2: v })),
-      select('Three fingers', settings.tap3, tapOptions(3), v => update({ tap3: v })),
-      select('Four fingers', settings.tap4, tapOptions(4), v => update({ tap4: v })),
+      choice('One finger', 'tap1', eff.tap1, [['leftclick', 'Left click'], ['none', 'Nothing']], v => update({ tap1: v })),
+      choice('Two fingers', 'tap2', eff.tap2, tapOptions(), v => update({ tap2: v })),
+      choice('Three fingers', 'tap3', eff.tap3, tapOptions(), v => update({ tap3: v })),
+      choice('Four fingers', 'tap4', eff.tap4, tapOptions(), v => update({ tap4: v })),
     ]));
     body.appendChild(swipeGroup('Three finger swipes', 'swipe3'));
     body.appendChild(swipeGroup('Four finger swipes', 'swipe4'));
     body.appendChild(group('Surface', [
-      toggle('Mouse buttons', 'Left and right buttons under the pad', 'buttons'),
+      toggle('Mouse buttons', 'Left and right under the pad', 'buttons'),
       toggle('Vibrate on clicks', 'Android only', 'haptics'),
-      toggle('Show touches', 'Amber rings under your fingers', 'ink'),
-      toggle('Keep screen on', 'While this page is open', 'keepAwake'),
-      el('div', { class: 'row' }, [el('label', { text: 'Reset everything' }),
-        el('button', { class: 'chip danger', text: 'Reset', onclick: () => { update(Object.assign({}, S.DEFAULTS)); renderSheet(); } })]),
+      toggle('Show touches', null, 'ink'),
+      toggle('Keep screen on', null, 'keepAwake'),
+      el('div', { class: 'row' }, [lbl('Reset phone settings', 'PC sync stays on'), el('button', { class: 'link-danger', text: 'Reset',
+        onclick: () => { update(Object.assign({}, S.DEFAULTS)); renderSheet(); } })]),
     ]));
-    if (!actionsCatalog.length) {
-      body.appendChild(el('p', { class: 'note', text: 'Action list loads from the PC once connected.' }));
-    }
+    if (!actionsCatalog.length) body.appendChild(el('p', { class: 'note', text: 'The action list arrives from the PC once connected.' }));
   }
 
   // ------------------------------------------------------------ start
   if (!key) {
-    showOverlay('Open the link from the host', 'The address printed by the host includes a pairing key, for example ?k=123456. Scan its QR code.');
+    showOverlay('Open the link from the host', 'The address printed by the host includes a pairing key such as ?k=123456. Scan its QR code.');
     setStatus('Not paired', false);
   } else {
     connect();

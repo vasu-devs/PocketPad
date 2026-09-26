@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import struct
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -28,10 +29,12 @@ from .config import (
 )
 from .injector import Injector
 from .keys import is_known_key, normalize_key
+from .smoother import MotionSmoother
 
 log = logging.getLogger(__name__)
 
 BUTTONS = {"left", "right", "middle"}
+BIN_MOVE, BIN_SCROLL, BIN_MOVE_END = 1, 2, 3
 
 
 class ProtocolError(ValueError):
@@ -60,6 +63,8 @@ class Session:
     """
     injector: Injector
     scroll: ScrollSettings = field(default_factory=ScrollSettings)
+    smoother: MotionSmoother | None = None   # None = inject deltas immediately
+    gain: float = 1.0                        # undoes the Windows pointer-speed slider
     _rx: float = 0.0
     _ry: float = 0.0
     _wx: float = 0.0
@@ -67,6 +72,11 @@ class Session:
 
     # ---- pointer -------------------------------------------------------
     def move(self, dx: float, dy: float) -> None:
+        dx *= self.gain
+        dy *= self.gain
+        if self.smoother is not None:
+            self.smoother.push(dx, dy)
+            return
         self._rx += dx
         self._ry += dy
         ix, iy = int(self._rx), int(self._ry)   # truncate toward zero
@@ -95,6 +105,35 @@ class Session:
     def reset_scroll(self) -> None:
         self._wx = self._wy = 0.0
 
+    def move_end(self) -> None:
+        if self.smoother is not None:
+            self.smoother.flush()
+
+    def close(self) -> None:
+        if self.smoother is not None:
+            self.smoother.stop()
+
+    # ---- binary fast path -----------------------------------------------
+    # <type:u8><dx:f32><dy:f32> little-endian; type 1 = move, 2 = scroll.
+    # A single byte 3 means "move ended".
+    def handle_binary(self, data: bytes) -> None:
+        if len(data) == 1 and data[0] == BIN_MOVE_END:
+            self.move_end()
+            return
+        if len(data) != 9:
+            raise ProtocolError("bad binary frame")
+        kind, dx, dy = struct.unpack("<Bff", data)
+        if not (math.isfinite(dx) and math.isfinite(dy)):
+            raise ProtocolError("bad binary number")
+        dx = max(-MAX_MOVE_PX, min(MAX_MOVE_PX, dx))
+        dy = max(-MAX_MOVE_PX, min(MAX_MOVE_PX, dy))
+        if kind == BIN_MOVE:
+            self.move(dx, dy)
+        elif kind == BIN_SCROLL:
+            self.scroll_px(dx, dy)
+        else:
+            raise ProtocolError("bad binary type")
+
     # ---- dispatch ------------------------------------------------------
     def handle_raw(self, raw: str) -> dict | None:
         if len(raw) > MAX_MESSAGE_BYTES:
@@ -119,6 +158,8 @@ class Session:
                            _num(msg.get("y"), -MAX_MOVE_PX, MAX_MOVE_PX))
         elif t == "se":            # scroll end: drop fractional remainder
             self.reset_scroll()
+        elif t == "me":            # move end: deliver whatever the smoother holds
+            self.move_end()
         elif t == "b":
             b = msg.get("b")
             if b not in BUTTONS:

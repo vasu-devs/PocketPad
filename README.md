@@ -19,10 +19,37 @@ phone browser  --Wi-Fi / WebSocket-->  host (Python, aiohttp)  --SendInput-->  W
 3. Tap once to go full screen. Android: "Add to Home screen" gives an icon that
    opens straight into the pad. iPhone: Share, then "Add to Home Screen".
 
-Windows setting worth knowing: **Settings > Bluetooth & devices > Mouse >
-Additional mouse settings > Pointer Options > "Enhance pointer precision"**.
-When it is on, Windows applies its own acceleration on top of PocketPad's, so
-lower the Speed slider or turn that option off if the cursor feels jumpy.
+## It follows your touchpad settings
+
+On connect the host reads your Windows Precision Touchpad preferences
+(cursor speed, scroll direction, taps, tap-and-drag, pinch, and the three and
+four finger swipe and tap choices) and the phone mirrors them. The settings
+sheet shows "Match this PC's touchpad" at the top with a summary of what it
+found; turn it off to tune the phone independently. Anyone who connects their
+phone to their own PC gets their own feel automatically.
+
+Two Windows mouse settings would otherwise distort injected motion, so the
+host handles them:
+
+- **Enhance pointer precision** is paused while the host runs and restored on
+  exit (live setting only, the registry is never touched). Use
+  `--keep-mouse-accel` to opt out.
+- The **mouse pointer speed slider** multiplies every injected move (3.5x at
+  the top of the slider). The host cancels that factor so the phone's speed
+  means the same thing on every PC.
+
+## Connection modes
+
+| Mode | Command | Latency | Notes |
+|---|---|---|---|
+| Wi-Fi via router | `PocketPad.bat` | 5-30 ms | default, both devices on the same network |
+| Laptop hotspot | `PocketPad.bat --hotspot` | 2-8 ms | turns on Windows Mobile Hotspot and prints its name and password; the phone talks straight to the laptop, no router |
+| USB cable (Android) | `PocketPad.bat --usb` | under 1 ms | needs USB debugging and `adb`; the phone opens `http://127.0.0.1:8765/?k=...` |
+
+Motion is sent as 9-byte binary frames, one per touch sample, and the host
+runs a motion smoother that spreads each sample evenly until the next one
+arrives, so Wi-Fi burstiness does not turn into cursor stutter. Disable it
+with `--no-smoothing` to compare.
 
 ## Gestures
 
@@ -58,9 +85,13 @@ on the PC, including Enter, Backspace, arrows and Unicode.
 
 ```
 host/
-  main.py        CLI, LAN address discovery, QR banner
+  main.py        CLI, LAN address discovery, QR banner, --usb / --hotspot
   server.py      aiohttp app: static files + /ws channel, pairing check, stuck-key release
-  protocol.py    wire format, per-connection accumulators (sub-pixel moves, wheel units)
+  protocol.py    wire format (JSON + binary motion frames), per-connection accumulators
+  smoother.py    high-rate motion smoother thread
+  sysprefs.py    reads Windows Precision Touchpad preferences from the registry
+  mouseaccel.py  pauses "Enhance pointer precision", reads the pointer-speed multiplier
+  netmodes.py    adb reverse (USB) and Windows Mobile Hotspot
   actions.py     named actions (Task view, volume, snap...) and `keys:` custom combos
   keys.py        virtual-key table, aliases, combo parser
   input_win.py   SendInput via ctypes (mouse, wheel, scan-code keys, Unicode text)
@@ -79,6 +110,7 @@ Design notes:
 - The phone owns all preferences and sends *semantic* events
   (`move`, `scroll`, `zoom`, `click`, `action:taskview`). The host is a dumb,
   validated injector. This keeps the host tiny and lets each phone keep its own feel.
+- The phone owns preferences but defers to the PC's touchpad settings by default.
 - Pointer deltas are floats. The host keeps the fractional remainder so slow
   movements are not lost to integer rounding. Same for wheel units.
 - Scroll emits small wheel deltas (smooth scrolling in Edge, Chrome, Explorer,
@@ -104,7 +136,7 @@ pip install -r requirements.txt
 python -m pytest -q
 ```
 
-21 tests cover the protocol (accumulators, clamps, rejections), the key table
+29 tests cover the protocol (accumulators, clamps, rejections), the key table
 and action catalog, and the HTTP + WebSocket server with a fake injector.
 Gesture recognition was verified in an emulated Pixel 7 (Playwright + Chrome
 DevTools touch events) for move, tap, two-finger tap, scroll, pinch, three

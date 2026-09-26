@@ -1,7 +1,8 @@
 /* Gesture engine: raw touches in, semantic pointer events out.
 
    Sink interface (all methods optional):
-     move(dx, dy)          accelerated pointer delta in px
+     move(dx, dy)          accelerated pointer delta in px, one call per touch sample
+     moveEnd()             finger lifted after moving
      scroll(dx, dy)        two-finger scroll delta in raw px
      scrollEnd()
      zoom(dir)             +1 in, -1 out
@@ -24,7 +25,7 @@
   const SCROLL_TRIGGER = 6;
   const MOVE_DEADZONE = 1.5;
 
-  // Speed in px/ms below which no acceleration applies and above which it maxes out.
+  // Finger speed (px/ms) where acceleration starts and where it saturates.
   const ACCEL_LOW = 0.12;
   const ACCEL_HIGH = 1.4;
 
@@ -47,8 +48,7 @@
 
   function spread(list) {
     if (list.length < 2) return 0;
-    const dx = list[0].x - list[1].x, dy = list[0].y - list[1].y;
-    return Math.hypot(dx, dy);
+    return Math.hypot(list[0].x - list[1].x, list[0].y - list[1].y);
   }
 
   class GestureEngine {
@@ -59,9 +59,6 @@
       this.touches = new Map();
       this.g = null;
       this.lastTap = null;
-      this.raf = 0;
-      this.pendingMove = { x: 0, y: 0 };
-
       const opts = { passive: false };
       el.addEventListener('touchstart', e => this.onStart(e), opts);
       el.addEventListener('touchmove', e => this.onMove(e), opts);
@@ -96,17 +93,15 @@
         this.g = {
           start: now, fingersMax: list.length, mode: null, moved: 0,
           origin: c, last: c, lastT: now, spread0: spread(list), lastSpread: spread(list),
-          zoomAcc: 0, dragArmed, swipeAxisOrigin: null,
+          zoomAcc: 0, dragArmed, swipeAxisOrigin: null, speedEma: 0,
         };
       } else {
-        // Extra finger landed: re-anchor so the jump in centroid is not a move.
+        // Another finger landed: re-anchor so the centroid jump is not motion.
         this.g.fingersMax = Math.max(this.g.fingersMax, list.length);
         this.g.origin = c; this.g.last = c;
         this.g.spread0 = this.g.lastSpread = spread(list);
-        if (this.g.mode === 'move' || this.g.mode === 'scroll' || this.g.mode === 'pinch') {
-          // Windows keeps the gesture; we do too but restart the decision.
-          if (list.length !== (this.g.mode === 'move' ? 1 : 2)) this.g.mode = null;
-        }
+        if (this.g.mode === 'move' && list.length !== 1) this.g.mode = null;
+        if ((this.g.mode === 'scroll' || this.g.mode === 'pinch') && list.length !== 2) this.g.mode = null;
       }
       this._contacts();
     }
@@ -130,16 +125,18 @@
       const s = this.getSettings();
       this._contacts();
 
-      // Decide the mode once movement is unambiguous.
       if (g.mode === null) {
         if (n === 1 && g.fingersMax === 1) {
-          if (g.moved > MOVE_DEADZONE) g.mode = g.dragArmed ? 'drag' : 'move';
-          if (g.mode === 'drag') this._emit('button', 'left', true);
+          if (g.moved > MOVE_DEADZONE) {
+            g.mode = g.dragArmed ? 'drag' : 'move';
+            if (g.mode === 'drag') this._emit('button', 'left', true);
+          }
         } else if (n === 2 && g.fingersMax === 2) {
           const sp = spread(list);
           const dSpread = Math.abs(sp - g.spread0);
-          if (dSpread > PINCH_TRIGGER && dSpread > g.moved) { g.mode = 'pinch'; g.lastSpread = sp; }
-          else if (g.moved > SCROLL_TRIGGER) g.mode = 'scroll';
+          if (s.zoom && dSpread > PINCH_TRIGGER && dSpread > g.moved) { g.mode = 'pinch'; g.lastSpread = sp; }
+          else if (s.pan && g.moved > SCROLL_TRIGGER) g.mode = 'scroll';
+          else if (!s.pan && !s.zoom && g.moved > TAP_MAX_MOVE) g.mode = 'dead';
         } else if (n >= 3) {
           if (n === 3 && s.threeFingerDrag) {
             if (g.moved > MOVE_DEADZONE) { g.mode = 'drag'; this._emit('button', 'left', true); }
@@ -148,7 +145,7 @@
             this._fireSwipe(g, c, n >= 4 ? 4 : 3, s);
           }
         } else if (n < g.fingersMax && g.moved > TAP_MAX_MOVE) {
-          g.mode = 'dead'; // fingers lifted, then the rest wandered: not a tap
+          g.mode = 'dead';
         }
         if (g.mode === null) return;
       }
@@ -156,11 +153,11 @@
       switch (g.mode) {
         case 'move':
         case 'drag': {
-          const speed = Math.hypot(dx, dy) / dt;
-          const k = gain(speed, s);
-          this.pendingMove.x += dx * k;
-          this.pendingMove.y += dy * k;
-          this._flushSoon();
+          // Smooth the speed estimate: touch timestamps are quantised to frames.
+          const inst = Math.hypot(dx, dy) / dt;
+          g.speedEma = g.speedEma ? 0.6 * g.speedEma + 0.4 * inst : inst;
+          const k = gain(g.speedEma, s);
+          this._emit('move', dx * k, dy * k);
           break;
         }
         case 'scroll':
@@ -176,35 +173,23 @@
           }
           break;
         }
-        case 'swipe': {
-          // Horizontal swipes repeat as the fingers keep travelling (app / desktop switching).
+        case 'swipe':
           if (g.swipeAxisOrigin && g.swipeHorizontal) {
-            const travel = c.x - g.swipeAxisOrigin.x;
-            if (Math.abs(travel) > SWIPE_REPEAT) this._fireSwipe(g, c, g.swipeFingers, s);
+            if (Math.abs(c.x - g.swipeAxisOrigin.x) > SWIPE_REPEAT) this._fireSwipe(g, c, g.swipeFingers, s);
           }
           break;
-        }
       }
     }
 
     _fireSwipe(g, c, fingers, s) {
-      const dx = c.x - (g.swipeAxisOrigin ? g.swipeAxisOrigin.x : g.origin.x);
-      const dy = c.y - (g.swipeAxisOrigin ? g.swipeAxisOrigin.y : g.origin.y);
+      const o = g.swipeAxisOrigin || g.origin;
+      const dx = c.x - o.x, dy = c.y - o.y;
       const horizontal = g.swipeAxisOrigin ? g.swipeHorizontal : Math.abs(dx) > Math.abs(dy);
       const dir = horizontal ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
       const map = fingers >= 4 ? s.swipe4 : s.swipe3;
       const action = map[dir] || 'none';
       g.swipeAxisOrigin = c; g.swipeHorizontal = horizontal; g.swipeFingers = fingers;
       if (action !== 'none') this._emit('action', action);
-    }
-
-    _flushSoon() {
-      if (this.raf) return;
-      this.raf = requestAnimationFrame(() => {
-        this.raf = 0;
-        const m = this.pendingMove;
-        if (m.x || m.y) { this._emit('move', m.x, m.y); m.x = 0; m.y = 0; }
-      });
     }
 
     onEnd(e) {
@@ -214,12 +199,10 @@
       const g = this.g;
       this._contacts();
       if (!g) return;
-      const remaining = this.touches.size;
 
-      if (remaining > 0) {
-        // Fingers rarely lift at the same instant. Re-anchor to the ones still
-        // down so the centroid jump is not counted as movement, and let the
-        // final lift decide whether this was a tap.
+      if (this.touches.size > 0) {
+        // Fingers rarely lift together. Re-anchor to the ones still down and
+        // let the final lift decide whether this was a tap.
         const c = centroid(this._list());
         g.last = c; g.origin = c;
         return;
@@ -230,30 +213,23 @@
       const isTap = g.mode === null && duration < TAP_MAX_MS && g.moved < TAP_MAX_MOVE;
 
       if (g.mode === 'drag') {
-        this._flushNow();
+        this._emit('moveEnd');
         this._emit('button', 'left', false);
+      } else if (g.mode === 'move') {
+        this._emit('moveEnd');
       } else if (g.mode === 'scroll') {
         this._emit('scrollEnd');
       } else if (isTap) {
         const n = Math.min(4, g.fingersMax);
         if (n === 1 && g.dragArmed) {
-          // Second tap of a double tap that never moved: complete the double click.
-          this._emit('click', 'left', 1);
+          this._emit('click', 'left', 1);   // completes the double click
           this.lastTap = null;
         } else {
           this._tapAction(n, s);
           this.lastTap = { t: now, x: g.origin.x, y: g.origin.y, fingers: n };
         }
-      } else {
-        this._flushNow();
       }
       this.g = null;
-    }
-
-    _flushNow() {
-      if (this.raf) { cancelAnimationFrame(this.raf); this.raf = 0; }
-      const m = this.pendingMove;
-      if (m.x || m.y) { this._emit('move', m.x, m.y); m.x = 0; m.y = 0; }
     }
 
     _tapAction(n, s) {

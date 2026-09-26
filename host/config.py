@@ -47,6 +47,7 @@ class HostConfig:
     key: str = field(default_factory=_make_key)
     web_dir: Path = WEB_DIR
     log_level: str = "INFO"
+    smoothing: bool = True
 
     @classmethod
     def from_env_and_args(cls, args) -> "HostConfig":
@@ -55,4 +56,5 @@ class HostConfig:
             port=int(args.port or os.environ.get("POCKETPAD_PORT", DEFAULT_PORT)),
             key=args.key or os.environ.get("POCKETPAD_KEY") or _make_key(),
             log_level=args.log_level or os.environ.get("POCKETPAD_LOG", "INFO"),
+            smoothing=not getattr(args, "no_smoothing", False),
         )

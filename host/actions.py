@@ -39,6 +39,7 @@ ACTIONS: dict[str, Action] = {
         Action("none", "Nothing", _nothing),
         Action("taskview", "Task view", _combo("win", "tab")),
         Action("showdesktop", "Show desktop", _combo("win", "d")),
+        Action("hideothers", "Hide everything except the focused app", _combo("win", "home")),
         Action("switchapp_next", "Switch to next app", _combo("alt", "tab")),
         Action("switchapp_prev", "Switch to previous app", _combo("alt", "shift", "tab")),
         Action("desktop_next", "Next virtual desktop", _combo("ctrl", "win", "right")),
