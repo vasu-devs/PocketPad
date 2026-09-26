@@ -159,6 +159,21 @@
     if (pageIsLandscape() === wantLandscape) { engine.setTransform(null); return; }
     engine.setTransform(wantLandscape ? ROTATE[want] : null);
   }
+  const ORIENT_CYCLE = ['auto', 'landscape-left', 'landscape-right', 'portrait'];
+  const ORIENT_LABEL = { auto: 'Rotates with the phone', 'landscape-left': 'Landscape, top to the left', 'landscape-right': 'Landscape, top to the right', portrait: 'Portrait' };
+  const rotateBtn = $('rotate-btn');
+  let statusHold = 0;
+  function paintRotate() { rotateBtn.classList.toggle('on', (eff.orientation || 'auto') !== 'auto'); }
+  rotateBtn.addEventListener('click', () => {
+    const cur = eff.orientation || 'auto';
+    const next = ORIENT_CYCLE[(ORIENT_CYCLE.indexOf(cur) + 1) % ORIENT_CYCLE.length];
+    update({ orientation: next });
+    buzz(8);
+    clearTimeout(statusHold);
+    const keep = statusEl.textContent, ok = statusEl.classList.contains('ok');
+    setStatus(ORIENT_LABEL[next], false);
+    statusHold = setTimeout(() => setStatus(keep, ok), 1400);
+  });
   window.addEventListener('resize', () => { applyOrientation(); });
   document.addEventListener('fullscreenchange', () => { applyOrientation(); });
 
@@ -217,7 +232,7 @@
     sendCfg();
     if (!eff.ink) { contacts = []; trail = []; drawInk(); }
     resizeCanvas();
-    if (typeof applyOrientation === 'function') applyOrientation();
+    if (typeof applyOrientation === 'function') { applyOrientation(); paintRotate(); }
   }
   function update(patch) { user = Object.assign({}, user, patch); S.save(user); recompute(); }
   recompute();
