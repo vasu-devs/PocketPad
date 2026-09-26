@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,7 +7,7 @@
 <meta name="description" content="Use your phone as a precision-style trackpad for Windows, macOS and Linux. Nothing to install on the phone. Open source, free.">
 <meta property="og:title" content="PocketPad">
 <meta property="og:description" content="Your phone is the trackpad you wanted. Windows, macOS and Linux. Nothing to install on the phone.">
-<meta property="og:image" content="https://pocketpad.vercel.app/assets/pad_main.png">
+<meta property="og:image" content="https://getpocketpad.vercel.app/assets/pad_main.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:creator" content="@vasu_devs">
 <meta name="theme-color" content="#0b0c0e">
@@ -147,8 +147,8 @@ footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
 .foot p a { color: var(--muted); }
 
 /* reveal */
-.rv { opacity: 0; transform: translateY(14px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
-.rv.in { opacity: 1; transform: none; }
+html.js .rv { opacity: 0; transform: translateY(14px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+html.js .rv.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
 
 @media (max-width: 900px) {
@@ -375,6 +375,7 @@ pocketpad</pre>
   // ---- reveal on scroll
   const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.15 });
   document.querySelectorAll('.rv').forEach(el => io.observe(el));
+  setTimeout(() => document.querySelectorAll('.rv').forEach(el => el.classList.add('in')), 2500); // safety net
 
   // ---- live demo: drag on the phone, the cursor moves on the laptop
   const phone = document.getElementById('phone'), canvas = document.getElementById('ink'), ctx = canvas.getContext('2d');

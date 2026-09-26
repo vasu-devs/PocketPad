@@ -1,6 +1,6 @@
 # PocketPad
 
-**Website and downloads: [pocketpad.vercel.app](https://pocketpad.vercel.app)**
+**Website and downloads: [getpocketpad.vercel.app](https://getpocketpad.vercel.app)**
 
 Use your phone as a precision-style trackpad for Windows, macOS and Linux. Nothing to install on the
 phone: a small host runs on the laptop, the phone opens a web page, and every

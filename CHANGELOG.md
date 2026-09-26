@@ -4,7 +4,7 @@
 
 - macOS and Linux hosts (pynput: Quartz on macOS, X11 XTest on Linux) with per-platform shortcut tables and preference readers.
 - CI builds and smoke-tests PocketPad-windows.exe, PocketPad-macos and PocketPad-linux and attaches them to releases.
-- Website at pocketpad.vercel.app.
+- Website at getpocketpad.vercel.app.
 
 ## 0.2.0 (2026-09-27)
 
