@@ -9,7 +9,11 @@
      click(button, n)      tap; button = left|right|middle
      button(button, down)  press / release (drag)
      action(name)          named action from settings
+     switcher(phase, dir)  live app switcher: 'start' | 'step' | 'end', dir +1 / -1
      contacts(list)        [{x, y}] active touches, for the ink layer
+
+   setTransform(fn) rotates raw touch coordinates when the phone is held
+   sideways but the page itself did not rotate (OS rotation locked, iPhone).
 */
 (function () {
   'use strict';
@@ -59,11 +63,18 @@
       this.touches = new Map();
       this.g = null;
       this.lastTap = null;
+      this.transform = null;
       const opts = { passive: false };
       el.addEventListener('touchstart', e => this.onStart(e), opts);
       el.addEventListener('touchmove', e => this.onMove(e), opts);
       el.addEventListener('touchend', e => this.onEnd(e), opts);
       el.addEventListener('touchcancel', e => this.onEnd(e), opts);
+    }
+
+    setTransform(fn) { this.transform = fn; }
+
+    _pt(t) {
+      return this.transform ? this.transform(t.clientX, t.clientY) : { x: t.clientX, y: t.clientY };
     }
 
     _emit(name, ...args) {
@@ -74,14 +85,16 @@
     _list() { return Array.from(this.touches.values()); }
 
     _contacts() {
-      this._emit('contacts', this._list().map(t => ({ x: t.x, y: t.y })));
+      // Ink is drawn in screen space, so hand back the untransformed points.
+      this._emit('contacts', this._list().map(t => ({ x: t.raw.x, y: t.raw.y })));
     }
 
     onStart(e) {
       e.preventDefault();
       const now = performance.now();
       for (const t of e.changedTouches) {
-        this.touches.set(t.identifier, { x: t.clientX, y: t.clientY, t: now });
+        const p = this._pt(t);
+        this.touches.set(t.identifier, { x: p.x, y: p.y, t: now, raw: { x: t.clientX, y: t.clientY } });
       }
       const list = this._list();
       const c = centroid(list);
@@ -113,7 +126,7 @@
       const now = performance.now();
       for (const t of e.changedTouches) {
         const rec = this.touches.get(t.identifier);
-        if (rec) { rec.x = t.clientX; rec.y = t.clientY; }
+        if (rec) { const p = this._pt(t); rec.x = p.x; rec.y = p.y; rec.raw = { x: t.clientX, y: t.clientY }; }
       }
       const list = this._list();
       const n = list.length;
@@ -188,7 +201,15 @@
       const dir = horizontal ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
       const map = fingers >= 4 ? s.swipe4 : s.swipe3;
       const action = map[dir] || 'none';
+      const first = !g.swipeAxisOrigin;
       g.swipeAxisOrigin = c; g.swipeHorizontal = horizontal; g.swipeFingers = fingers;
+      if (horizontal && (action === 'switchapp_next' || action === 'switchapp_prev')) {
+        // Like Windows: the switcher stays open while the fingers are down and
+        // the selection follows the hand. Alt is released when they lift.
+        g.switcher = true;
+        this._emit('switcher', first ? 'start' : 'step', action === 'switchapp_next' ? 1 : -1);
+        return;
+      }
       if (action !== 'none') this._emit('action', action);
     }
 
@@ -219,6 +240,8 @@
         this._emit('moveEnd');
       } else if (g.mode === 'scroll') {
         this._emit('scrollEnd');
+      } else if (g.mode === 'swipe' && g.switcher) {
+        this._emit('switcher', 'end', 0);
       } else if (isTap) {
         const n = Math.min(4, g.fingersMax);
         if (n === 1 && g.dragArmed) {

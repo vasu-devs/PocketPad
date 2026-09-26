@@ -28,6 +28,11 @@ sheet shows "Match this PC's touchpad" at the top with a summary of what it
 found; turn it off to tune the phone independently. Anyone who connects their
 phone to their own PC gets their own feel automatically.
 
+Holding the phone sideways: the layout rotates with the phone. If your phone's
+rotation is locked, pick Landscape in Settings > Surface > Orientation; the app
+asks the browser to rotate and, if that is refused, rotates the touch input
+instead so the cursor still follows your hand.
+
 Two Windows mouse settings would otherwise distort injected motion, so the
 host handles them:
 
@@ -43,8 +48,8 @@ host handles them:
 | Mode | Command | Latency | Notes |
 |---|---|---|---|
 | Wi-Fi via router | `PocketPad.bat` | 5-30 ms | default, both devices on the same network |
-| Laptop hotspot | `PocketPad.bat --hotspot` | 2-8 ms | turns on Windows Mobile Hotspot and prints its name and password; the phone talks straight to the laptop, no router |
-| USB cable (Android) | `PocketPad.bat --usb` | under 1 ms | needs USB debugging and `adb`; the phone opens `http://127.0.0.1:8765/?k=...` |
+| Laptop hotspot | `PocketPad.bat --hotspot` | 2-8 ms | turns on Windows Mobile Hotspot, prints its name and password, and shows the laptop's hotspot address (192.168.137.x) first |
+| USB cable (Android) | `PocketPad.bat --usb` | under 1 ms | downloads Google's platform-tools on first use; needs USB debugging on the phone; the phone opens `http://127.0.0.1:8765/?k=...` |
 
 Motion is sent as 9-byte binary frames, one per touch sample, and the host
 runs a motion smoother that spreads each sample evenly until the next one
@@ -64,7 +69,7 @@ with `--no-smoothing` to compare.
 | 2 | pinch | zoom (Ctrl + wheel) |
 | 3 | tap | middle click |
 | 3 | swipe up / down | Task view / Show desktop |
-| 3 | swipe left / right | Switch apps (repeats as you keep sliding) |
+| 3 | swipe left / right | App switcher opens and follows your hand; lifts to commit, like Windows |
 | 4 | tap | Notification center |
 | 4 | swipe up / down | Task view / Show desktop |
 | 4 | swipe left / right | Switch virtual desktops (repeats) |
@@ -136,7 +141,7 @@ pip install -r requirements.txt
 python -m pytest -q
 ```
 
-29 tests cover the protocol (accumulators, clamps, rejections), the key table
+33 tests cover the protocol (accumulators, clamps, rejections), the key table
 and action catalog, and the HTTP + WebSocket server with a fake injector.
 Gesture recognition was verified in an emulated Pixel 7 (Playwright + Chrome
 DevTools touch events) for move, tap, two-finger tap, scroll, pinch, three

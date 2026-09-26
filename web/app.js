@@ -127,10 +127,40 @@
     click(b, n) { hideHint(); send({ t: 'c', b, n }); buzz(8); },
     button(b, down) { send({ t: 'b', b, s: down ? 1 : 0 }); if (down) buzz(12); },
     action(a) { send({ t: 'a', a }); buzz(14); },
+    switcher(p, d) { send({ t: 'g', g: 'switchapp', p, d }); if (p !== 'end') buzz(10); },
     contacts: setContacts,
   };
   const surface = $('surface');
-  new window.GestureEngine(surface, sink, () => eff);
+  const engine = new window.GestureEngine(surface, sink, () => eff);
+
+  // ------------------------------------------------------------ orientation
+  // 'auto' trusts the OS. A manual choice first asks the browser to lock the
+  // screen; if that is refused (rotation locked, iPhone Safari) the page stays
+  // as it is and touch coordinates are rotated instead, so holding the phone
+  // sideways still moves the cursor the way your hand moves.
+  const ROTATE = {
+    'landscape-left':  (x, y) => ({ x: -y, y: x }),   // top of the phone points left
+    'landscape-right': (x, y) => ({ x: y, y: -x }),   // top of the phone points right
+  };
+  function pageIsLandscape() { return window.innerWidth > window.innerHeight; }
+  async function applyOrientation() {
+    const want = eff.orientation || 'auto';
+    const so = screen.orientation;
+    document.body.dataset.orientation = want;
+    if (want === 'auto') {
+      engine.setTransform(null);
+      if (so && so.unlock) { try { so.unlock(); } catch (e) { /* ignore */ } }
+      return;
+    }
+    const target = want === 'portrait' ? 'portrait-primary' : (want === 'landscape-left' ? 'landscape-primary' : 'landscape-secondary');
+    if (so && so.lock) { try { await so.lock(target); } catch (e) { /* not allowed here */ } }
+    // Did the page end up the way the user wants? Then no transform is needed.
+    const wantLandscape = want !== 'portrait';
+    if (pageIsLandscape() === wantLandscape) { engine.setTransform(null); return; }
+    engine.setTransform(wantLandscape ? ROTATE[want] : null);
+  }
+  window.addEventListener('resize', () => { applyOrientation(); });
+  document.addEventListener('fullscreenchange', () => { applyOrientation(); });
 
   surface.addEventListener('touchend', function goFull() {
     surface.removeEventListener('touchend', goFull);
@@ -187,6 +217,7 @@
     sendCfg();
     if (!eff.ink) { contacts = []; trail = []; drawInk(); }
     resizeCanvas();
+    if (typeof applyOrientation === 'function') applyOrientation();
   }
   function update(patch) { user = Object.assign({}, user, patch); S.save(user); recompute(); }
   recompute();
@@ -315,7 +346,11 @@
     ]));
     body.appendChild(swipeGroup('Three finger swipes', 'swipe3'));
     body.appendChild(swipeGroup('Four finger swipes', 'swipe4'));
+    const ORIENT = [['auto', 'Rotate with the phone'], ['portrait', 'Portrait'], ['landscape-left', 'Landscape, top to the left'], ['landscape-right', 'Landscape, top to the right']];
+    const orientRow = choice('Orientation', 'orientation', eff.orientation || 'auto', ORIENT, v => update({ orientation: v }));
+    orientRow.querySelector('.vbtn span').textContent = (ORIENT.find(o => o[0] === (eff.orientation || 'auto')) || ORIENT[0])[1];
     body.appendChild(group('Surface', [
+      orientRow,
       toggle('Mouse buttons', 'Left and right under the pad', 'buttons'),
       toggle('Vibrate on clicks', 'Android only', 'haptics'),
       toggle('Show touches', null, 'ink'),

@@ -38,6 +38,7 @@
     haptics: true,
     ink: true,
     keepAwake: true,
+    orientation: 'auto',   // auto | portrait | landscape-left | landscape-right
   };
 
   // Windows cursor speed 1..20 (10 = default) to a pointer multiplier.

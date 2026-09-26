@@ -172,5 +172,20 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--faint); }
 .opt.on { color: var(--accent); }
 .opt svg { width: 20px; height: 20px; opacity: 0; } .opt.on svg { opacity: 1; }
 
+/* ---- landscape: dock becomes a column on the right ---- */
+@media (orientation: landscape) {
+  body {
+    grid-template-columns: 1fr var(--dock-h); grid-template-rows: 1fr auto;
+    padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 8px);
+  }
+  .pad { grid-column: 1; grid-row: 1; }
+  .buttons { grid-column: 1; grid-row: 2; height: 56px; }
+  .dock { grid-column: 2; grid-row: 1 / span 2; height: auto; grid-template-columns: 1fr; grid-template-rows: 52px 1fr 52px; justify-items: center; }
+  .dock-status { writing-mode: vertical-rl; transform: rotate(180deg); display: flex; gap: 6px; align-items: center; }
+  .dock-name { font-size: 13px; }
+  .hint { bottom: 14px; left: 20px; right: 20px; font-size: 13px; }
+  .hint br { display: none; }
+}
+
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .sheet, .picker, .hint, .switch::after { transition: none; } }

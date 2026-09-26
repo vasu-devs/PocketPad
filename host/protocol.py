@@ -8,6 +8,8 @@ Messages are small JSON objects with a one-letter type `t`:
     {"t":"s","x":0,"y":-12.5}         two-finger scroll in touch pixels
     {"t":"z","d":1}                   zoom step (+1 in, -1 out)
     {"t":"a","a":"taskview"}          named action (see actions.py)
+    {"t":"g","g":"switchapp","p":"start"|"step"|"end","d":1|-1}
+                                      live Alt+Tab switcher: Alt is held from start to end
     {"t":"k","k":"enter"}             single key press
     {"t":"txt","s":"hello"}           type unicode text
     {"t":"cfg","scroll":1.0,"natural":true,"notched":false}
@@ -65,6 +67,7 @@ class Session:
     scroll: ScrollSettings = field(default_factory=ScrollSettings)
     smoother: MotionSmoother | None = None   # None = inject deltas immediately
     gain: float = 1.0                        # undoes the Windows pointer-speed slider
+    _alt_held: bool = False
     _rx: float = 0.0
     _ry: float = 0.0
     _wx: float = 0.0
@@ -112,6 +115,19 @@ class Session:
     def close(self) -> None:
         if self.smoother is not None:
             self.smoother.stop()
+        self._switcher("end", 0)
+
+    # ---- live app switcher -----------------------------------------------
+    def _switcher(self, phase: str, d: int) -> None:
+        inj = self.injector
+        if phase in ("start", "step"):
+            if not self._alt_held:
+                inj.key("alt", True)
+                self._alt_held = True
+            inj.key_combo(("tab",) if d >= 0 else ("shift", "tab"))
+        elif phase == "end" and self._alt_held:
+            inj.key("alt", False)
+            self._alt_held = False
 
     # ---- binary fast path -----------------------------------------------
     # <type:u8><dx:f32><dy:f32> little-endian; type 1 = move, 2 = scroll.
@@ -191,6 +207,10 @@ class Session:
                 log.warning("%s unknown action %r", ErrorCode.UNKNOWN_ACTION, name)
                 raise ProtocolError("unknown action") from e
             fn(inj)
+        elif t == "g":
+            if msg.get("g") != "switchapp" or msg.get("p") not in ("start", "step", "end"):
+                raise ProtocolError("bad gesture")
+            self._switcher(msg["p"], int(_num(msg.get("d", 1), -1, 1)))
         elif t == "k":
             k = msg.get("k")
             if not isinstance(k, str) or not is_known_key(k):

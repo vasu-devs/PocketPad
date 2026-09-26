@@ -16,7 +16,7 @@ from aiohttp import web
 from .config import APP_NAME, VERSION, HostConfig
 from .injector import FakeInjector
 from .mouseaccel import MouseAccelGuard
-from .netmodes import setup_usb, start_hotspot
+from .netmodes import hotspot_ip, setup_usb, start_hotspot
 from .server import create_app
 
 log = logging.getLogger("pocketpad")
@@ -61,12 +61,21 @@ def _print_qr(url: str) -> None:
         print("  (terminal cannot draw the QR code; type the address instead)")
 
 
-def _banner(config: HostConfig) -> None:
+def _banner(config: HostConfig, prefer_ip: str | None = None, usb: bool = False) -> None:
     ips = _lan_ips()
+    if prefer_ip:
+        ips = [prefer_ip] + [ip for ip in ips if ip != prefer_ip]
+    if usb:
+        ips = ["127.0.0.1"] + [ip for ip in ips if ip != "127.0.0.1"]
     primary = ips[0]
     url = f"http://{primary}:{config.port}/?k={config.key}"
     print(f"\n  {APP_NAME} {VERSION}")
-    print("  Open this on your phone (same Wi-Fi):\n")
+    if usb:
+        print("  Open this on the phone (USB cable):\n")
+    elif prefer_ip:
+        print("  Open this on your phone once it has joined the laptop hotspot:\n")
+    else:
+        print("  Open this on your phone (same Wi-Fi):\n")
     print(f"    {url}\n")
     if len(ips) > 1:
         print("  Other addresses on this PC:")
@@ -104,14 +113,19 @@ def main(argv: list[str] | None = None) -> int:
         injector = WindowsInjector()
 
     app = create_app(config, injector)
-    _banner(config)
 
+    prefer_ip = None
+    usb_ok = False
     if args.hotspot:
         ok, msg = start_hotspot()
-        print("  " + msg + "\n")
+        print("\n  " + msg)
+        prefer_ip = hotspot_ip() if ok else None
+        if ok and not prefer_ip:
+            print("  (hotspot address not visible yet; if the phone cannot connect, rerun in a few seconds)")
     if args.usb:
-        ok, msg = setup_usb(config.port)
-        print("  " + msg + (f"?k={config.key}" if ok else "") + "\n")
+        usb_ok, msg = setup_usb(config.port)
+        print("\n  " + msg)
+    _banner(config, prefer_ip=prefer_ip, usb=usb_ok)
 
     guard = MouseAccelGuard()
     if not args.keep_mouse_accel and not args.dry_run:
