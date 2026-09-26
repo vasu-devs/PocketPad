@@ -2,6 +2,7 @@ import pytest
 
 from pocketpad import netmodes
 from pocketpad.injector import FakeInjector
+from pocketpad.platform_info import SWITCHER_MOD
 from pocketpad.protocol import ProtocolError, Session
 
 
@@ -13,10 +14,10 @@ def test_switcher_holds_alt_until_end():
     s.handle({"t": "g", "g": "switchapp", "p": "step", "d": -1})
     s.handle({"t": "g", "g": "switchapp", "p": "end"})
     assert inj.calls == [
-        ("key", "alt", True), ("combo", ("tab",)),
+        ("key", SWITCHER_MOD, True), ("combo", ("tab",)),
         ("combo", ("tab",)),
         ("combo", ("shift", "tab")),
-        ("key", "alt", False),
+        ("key", SWITCHER_MOD, False),
     ]
 
 
@@ -25,9 +26,9 @@ def test_switcher_released_on_close():
     s = Session(inj)
     s.handle({"t": "g", "g": "switchapp", "p": "start", "d": 1})
     s.close()
-    assert inj.calls[-1] == ("key", "alt", False)
+    assert inj.calls[-1] == ("key", SWITCHER_MOD, False)
     s.close()  # idempotent
-    assert inj.calls.count(("key", "alt", False)) == 1
+    assert inj.calls.count(("key", SWITCHER_MOD, False)) == 1
 
 
 def test_switcher_rejects_garbage():
