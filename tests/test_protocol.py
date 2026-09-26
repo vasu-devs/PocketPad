@@ -89,7 +89,9 @@ def test_zoom_holds_ctrl(sess):
 def test_named_action_and_custom_combo(sess):
     s, inj = sess
     s.handle({"t": "a", "a": "taskview"})
-    assert inj.calls == [("combo", ("win", "tab"))]
+    from pocketpad.platform_info import OS
+    expected = {"win": ("win", "tab"), "mac": ("ctrl", "up"), "linux": ("win",)}[OS]
+    assert inj.calls == [("combo", expected)]
     inj.calls.clear()
     s.handle({"t": "a", "a": "keys:Ctrl+Shift+T"})
     assert inj.calls == [("combo", ("ctrl", "shift", "t"))]

@@ -58,6 +58,7 @@ def test_session_routes_moves_through_smoother():
 
 
 def test_sysprefs_defaults(monkeypatch):
+    monkeypatch.setattr(sysprefs.sys, "platform", "win32")   # exercise the Windows reader everywhere
     monkeypatch.setattr(sysprefs, "_read_key", lambda path: {})
     p = sysprefs.read_touchpad_prefs()
     assert p["cursorSpeed"] == 10 and p["natural"] is True
@@ -72,6 +73,7 @@ def test_sysprefs_custom(monkeypatch):
         "ThreeFingerSlideEnabled": 4, "ThreeFingerUp": 12, "ThreeFingerLeft": 1,
         "FourFingerSlideEnabled": 3, "FourFingerTapEnabled": 4,
     }
+    monkeypatch.setattr(sysprefs.sys, "platform", "win32")
     monkeypatch.setattr(sysprefs, "_read_key",
                         lambda path: raw if path == sysprefs.PTP_KEY else {"MouseSpeed": 0})
     p = sysprefs.read_touchpad_prefs()
