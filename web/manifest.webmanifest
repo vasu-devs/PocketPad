@@ -1,0 +1,12 @@
+{
+  "name": "PocketPad",
+  "short_name": "PocketPad",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0f1113",
+  "theme_color": "#0f1113",
+  "start_url": "/",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
