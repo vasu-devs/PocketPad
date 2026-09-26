@@ -42,6 +42,7 @@
     texture: 'plain',      // plain | grid | dots | carbon
     corners: 'round',      // round | sharp
     keepAwake: true,
+    scrollStrip: true,
     orientation: 'auto',   // auto | portrait | landscape-left | landscape-right
   };
 

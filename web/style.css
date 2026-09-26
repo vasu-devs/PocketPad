@@ -55,8 +55,17 @@ body[data-texture="grid"] .pad { background-image: radial-gradient(120% 90% at 5
 body[data-texture="dots"] .pad { background-image: radial-gradient(var(--line) 1px, transparent 1.5px); background-size: 22px 22px; background-position: 11px 11px; }
 body[data-texture="carbon"] .pad { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 6px), repeating-linear-gradient(45deg, rgba(0,0,0,0.25) 0 2px, transparent 2px 6px); }
 #ink { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* scroll strip: a narrow lane on the right edge; one finger there scrolls */
+.strip { position: absolute; top: 0; right: 0; bottom: 0; width: 46px; touch-action: none; }
+.strip[hidden] { display: none; }
+.strip-track { position: absolute; top: 18px; bottom: 18px; right: 20px; width: 2px; border-radius: 1px; background: var(--line); }
+.strip-thumb { position: absolute; right: 12px; width: 18px; height: 42px; border-radius: 9px; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); opacity: 0; transform: translateY(-50%); transition: opacity 0.25s; }
+.strip.active .strip-thumb { opacity: 1; transition: none; }
+.strip::after { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 46px; background: linear-gradient(to right, transparent, rgba(127,127,127,0.05)); pointer-events: none; }
+body[data-strip="off"] .hint { right: 24px; }
+.hint { right: 64px; }
 .hint {
-  position: absolute; left: 24px; right: 24px; bottom: 22px; margin: 0;
+  position: absolute; left: 24px; right: 64px; bottom: 22px; margin: 0;
   color: var(--faint); font-size: 14px; line-height: 1.5; pointer-events: none;
   transition: opacity 0.5s var(--ease);
 }

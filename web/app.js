@@ -205,6 +205,58 @@
     if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => { /* fine */ });
   });
 
+  // ------------------------------------------------------------ scroll strip
+  // One finger in the lane on the right edge scrolls; a flick keeps going.
+  const strip = $('strip'), stripThumb = $('strip-thumb');
+  let stripY = 0, stripT = 0, stripV = 0, stripRaf = 0, stripTouch = null;
+  const stripGain = () => 1.6 * (eff.scroll || 1);
+  function stripStop() { if (stripRaf) { cancelAnimationFrame(stripRaf); stripRaf = 0; } }
+  function stripCoast() {
+    stripRaf = 0;
+    const now = performance.now(), dt = Math.min(40, now - stripT); stripT = now;
+    const dy = stripV * dt;
+    if (Math.abs(stripV) < 0.05) { sink.scrollEnd(); strip.classList.remove('active'); return; }
+    sendDelta(2, 0, dy * stripGain());
+    stripV *= Math.pow(0.93, dt / 16);
+    stripRaf = requestAnimationFrame(stripCoast);
+  }
+  function stripPlaceThumb(clientY) {
+    const r = strip.getBoundingClientRect();
+    const y = Math.min(r.height - 30, Math.max(30, clientY - r.top));
+    stripThumb.style.top = y + 'px';
+  }
+  strip.addEventListener('touchstart', e => {
+    e.preventDefault(); e.stopPropagation();
+    if (stripTouch !== null) return;
+    stripStop();
+    const t = e.changedTouches[0];
+    stripTouch = t.identifier; stripY = t.clientY; stripT = performance.now(); stripV = 0;
+    strip.classList.add('active'); stripPlaceThumb(t.clientY); hideHint();
+  }, { passive: false });
+  strip.addEventListener('touchmove', e => {
+    e.preventDefault(); e.stopPropagation();
+    for (const t of e.changedTouches) {
+      if (t.identifier !== stripTouch) continue;
+      const now = performance.now(), dt = Math.max(1, now - stripT);
+      const dy = t.clientY - stripY;
+      stripV = 0.6 * stripV + 0.4 * (dy / dt);
+      stripY = t.clientY; stripT = now;
+      stripPlaceThumb(t.clientY);
+      sendDelta(2, 0, dy * stripGain());
+    }
+  }, { passive: false });
+  const stripEnd = e => {
+    e.preventDefault(); e.stopPropagation();
+    for (const t of e.changedTouches) {
+      if (t.identifier !== stripTouch) continue;
+      stripTouch = null;
+      if (Math.abs(stripV) > 0.15 && e.type === 'touchend') { stripT = performance.now(); stripRaf = requestAnimationFrame(stripCoast); }
+      else { sink.scrollEnd(); strip.classList.remove('active'); }
+    }
+  };
+  strip.addEventListener('touchend', stripEnd, { passive: false });
+  strip.addEventListener('touchcancel', stripEnd, { passive: false });
+
   // ------------------------------------------------------------ physical buttons
   const buttonsEl = $('buttons');
   for (const btn of buttonsEl.querySelectorAll('.mbtn')) {
@@ -293,6 +345,8 @@
   function recompute() {
     eff = S.effective(user, system);
     buttonsEl.hidden = !eff.buttons;
+    strip.hidden = eff.scrollStrip === false;
+    document.body.dataset.strip = strip.hidden ? 'off' : 'on';
     sendCfg();
     applyTheme();
     if ((eff.inkStyle || 'rings') === 'off') { contacts = []; trail = []; drawInk(); }
@@ -460,6 +514,7 @@
     body.appendChild(appearanceGroup());
     body.appendChild(group('Surface', [
       orientRow,
+      toggle('Scroll strip', 'Lane on the right edge; flick to coast', 'scrollStrip'),
       toggle('Mouse buttons', 'Left and right under the pad', 'buttons'),
       toggle('Keep screen on', null, 'keepAwake'),
       el('div', { class: 'row' }, [lbl('Reset phone settings', 'PC sync stays on'), el('button', { class: 'link-danger', text: 'Reset',
