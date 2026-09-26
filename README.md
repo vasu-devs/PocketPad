@@ -86,6 +86,15 @@ haptics, touch rings, keep-awake. Custom shortcuts are typed as
 The **Aa** button opens the phone keyboard and types into whatever has focus
 on the PC, including Enter, Backspace, arrows and Unicode.
 
+## Appearance
+
+Settings > Appearance: six themes (Graphite, Midnight, Forest, Rose, Pitch
+black, Paper), a free accent colour, pad surface (plain, grid, dots, carbon),
+touch effect (rings, glow, comet, off), round or sharp corners, and vibration
+strength. The dock has a rotate button that cycles orientation modes, and the
+keyboard button is a real toggle: amber means the phone keyboard is open and
+typing goes to the PC.
+
 ## Layout
 
 ```

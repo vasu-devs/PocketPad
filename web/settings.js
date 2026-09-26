@@ -35,8 +35,12 @@
     dragOnDoubleTap: true,
     threeFingerDrag: false,
     buttons: false,
-    haptics: true,
-    ink: true,
+    haptics: 1,            // 0 off, 0.5 light, 1 normal, 2 strong
+    inkStyle: 'rings',     // rings | glow | comet | off
+    theme: 'graphite',
+    accent: '',            // '' = theme default, else #rrggbb
+    texture: 'plain',      // plain | grid | dots | carbon
+    corners: 'round',      // round | sharp
     keepAwake: true,
     orientation: 'auto',   // auto | portrait | landscape-left | landscape-right
   };
@@ -47,9 +51,20 @@
     return +(0.25 + ((c - 1) / 19) * 2.25).toFixed(2);
   }
 
+  const THEMES = {
+    graphite: { label: 'Graphite', bg: '#0b0c0e', pad: '#111317', edge: 'rgba(255,255,255,0.07)', panel: '#15171b', panel2: '#1c1f24', line: 'rgba(255,255,255,0.08)', text: '#ece9e2', muted: '#8d939c', faint: '#5c626b', accent: '#f0b23c' },
+    midnight: { label: 'Midnight', bg: '#070b14', pad: '#0d1322', edge: 'rgba(160,190,255,0.10)', panel: '#111a2b', panel2: '#172238', line: 'rgba(160,190,255,0.10)', text: '#e6ecf7', muted: '#8794ab', faint: '#566179', accent: '#5aa9ff' },
+    forest:   { label: 'Forest', bg: '#0a0f0c', pad: '#101712', panel: '#141d18', edge: 'rgba(180,255,200,0.08)', panel2: '#1b2620', line: 'rgba(180,255,200,0.08)', text: '#e8efe9', muted: '#8ea095', faint: '#5e6f65', accent: '#7fd18b' },
+    rose:     { label: 'Rose', bg: '#120a0e', pad: '#1a1015', panel: '#1f141a', edge: 'rgba(255,190,210,0.09)', panel2: '#2a1a22', line: 'rgba(255,190,210,0.09)', text: '#f3e8ec', muted: '#a48a95', faint: '#6f5a63', accent: '#ff6f91' },
+    oled:     { label: 'Pitch black', bg: '#000000', pad: '#050505', panel: '#0d0d0d', edge: 'rgba(255,255,255,0.10)', panel2: '#161616', line: 'rgba(255,255,255,0.09)', text: '#f2f2f2', muted: '#8a8a8a', faint: '#555555', accent: '#e8e8e8' },
+    paper:    { label: 'Paper', bg: '#e9e6df', pad: '#f7f5f0', panel: '#f7f5f0', edge: 'rgba(0,0,0,0.08)', panel2: '#e3dfd6', line: 'rgba(0,0,0,0.08)', text: '#1c1b19', muted: '#6b6862', faint: '#9a968e', accent: '#c2410c', light: true },
+  };
+
   function load() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { saved = {}; }
+    if (typeof saved.haptics === 'boolean') saved.haptics = saved.haptics ? 1 : 0;
+    if (typeof saved.ink === 'boolean') { saved.inkStyle = saved.ink ? 'rings' : 'off'; delete saved.ink; }
     const s = Object.assign({}, DEFAULTS, saved);
     s.swipe3 = Object.assign({}, DEFAULTS.swipe3, saved.swipe3 || {});
     s.swipe4 = Object.assign({}, DEFAULTS.swipe4, saved.swipe4 || {});
@@ -112,5 +127,5 @@
     return 'Following ' + system.host + ': ' + parts.join(', ') + '.';
   }
 
-  window.PocketSettings = { DEFAULTS, SWIPE_PRESETS, SYNCED, load, save, presetOf, effective, describeSystem, speedFromWindows };
+  window.PocketSettings = { DEFAULTS, SWIPE_PRESETS, SYNCED, THEMES, load, save, presetOf, effective, describeSystem, speedFromWindows };
 })();

@@ -23,8 +23,16 @@ INJECTOR_KEY = web.AppKey("injector", object)
 CONFIG_KEY = web.AppKey("config", HostConfig)
 
 
+@web.middleware
+async def _no_cache(request: web.Request, handler):
+    # Phones keep the page open for days; make every reload pick up host updates.
+    resp = await handler(request)
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 def create_app(config: HostConfig, injector: Injector) -> web.Application:
-    app = web.Application()
+    app = web.Application(middlewares=[_no_cache])
     app[INJECTOR_KEY] = injector
     app[CONFIG_KEY] = config
     app.router.add_get("/", _index)

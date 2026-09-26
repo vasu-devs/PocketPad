@@ -70,7 +70,7 @@
   function sendCfg() { send({ t: 'cfg', scroll: 1, natural: eff.natural, notched: eff.notched }); }
   $('retry-btn').addEventListener('click', connect);
 
-  function buzz(ms) { if (eff.haptics && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) { /* ignore */ } } }
+  function buzz(ms) { const k = Number(eff.haptics) || 0; if (k && navigator.vibrate) { try { navigator.vibrate(Math.max(1, Math.round(ms * k))); } catch (e) { /* ignore */ } } }
 
   // ------------------------------------------------------------ ink layer
   const canvas = $('ink'), ctx = canvas.getContext('2d');
@@ -84,28 +84,50 @@
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
+  let inkRGB = '240,178,60';
   function drawInk() {
     inkRaf = 0;
     const r = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, r.width, r.height);
-    if (!eff.ink) return;
+    const style = eff.inkStyle || 'rings';
+    if (style === 'off') return;
     const now = performance.now();
-    trail = trail.filter(p => now - p.t < 380);
-    ctx.lineWidth = 1.25;
-    for (const p of trail) {
-      const a = 1 - (now - p.t) / 380;
-      ctx.beginPath(); ctx.arc(p.x - r.left, p.y - r.top, 5 + 9 * (1 - a), 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(240,178,60,' + (0.3 * a).toFixed(3) + ')'; ctx.stroke();
-    }
-    for (const c of contacts) {
-      ctx.beginPath(); ctx.arc(c.x - r.left, c.y - r.top, 18, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(240,178,60,0.12)'; ctx.fill();
-      ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(240,178,60,0.85)'; ctx.stroke();
+    const life = style === 'comet' ? 650 : 380;
+    trail = trail.filter(p => now - p.t < life);
+    if (style === 'rings') {
+      ctx.lineWidth = 1.25;
+      for (const p of trail) {
+        const a = 1 - (now - p.t) / life;
+        ctx.beginPath(); ctx.arc(p.x - r.left, p.y - r.top, 5 + 9 * (1 - a), 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(' + inkRGB + ',' + (0.3 * a).toFixed(3) + ')'; ctx.stroke();
+      }
+      for (const c of contacts) {
+        ctx.beginPath(); ctx.arc(c.x - r.left, c.y - r.top, 18, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + inkRGB + ',0.12)'; ctx.fill();
+        ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(' + inkRGB + ',0.85)'; ctx.stroke();
+      }
+    } else if (style === 'glow') {
+      for (const c of contacts) {
+        const x = c.x - r.left, y = c.y - r.top;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 70);
+        g.addColorStop(0, 'rgba(' + inkRGB + ',0.45)'); g.addColorStop(1, 'rgba(' + inkRGB + ',0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 70, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (style === 'comet') {
+      for (const p of trail) {
+        const a = 1 - (now - p.t) / life;
+        ctx.beginPath(); ctx.arc(p.x - r.left, p.y - r.top, 2 + 6 * a, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + inkRGB + ',' + (0.55 * a).toFixed(3) + ')'; ctx.fill();
+      }
+      for (const c of contacts) {
+        ctx.beginPath(); ctx.arc(c.x - r.left, c.y - r.top, 7, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + inkRGB + ',0.95)'; ctx.fill();
+      }
     }
     if (contacts.length || trail.length) inkRaf = requestAnimationFrame(drawInk);
   }
   function setContacts(list) {
-    if (!eff.ink) return;
+    if ((eff.inkStyle || 'rings') === 'off') return;
     const now = performance.now();
     for (const c of list) trail.push({ x: c.x, y: c.y, t: now });
     if (trail.length > 300) trail.splice(0, trail.length - 300);
@@ -197,12 +219,30 @@
   const typer = $('typer'), kbdBtn = $('kbd-btn');
   const SENTINEL = ' ';
   typer.value = SENTINEL;
-  kbdBtn.addEventListener('click', () => {
-    if (document.activeElement === typer) typer.blur();
-    else { typer.focus(); typer.setSelectionRange(1, 1); }
-  });
-  typer.addEventListener('focus', () => kbdBtn.classList.add('on'));
-  typer.addEventListener('blur', () => kbdBtn.classList.remove('on'));
+  // Explicit on/off state. Tapping the button must not steal focus first,
+  // otherwise the blur would read as "closed" and the tap would reopen it.
+  let kbdOn = false;
+  function setKeyboard(on) {
+    kbdOn = on;
+    kbdBtn.classList.toggle('on', on);
+    if (on) { typer.focus({ preventScroll: true }); typer.setSelectionRange(1, 1); }
+    else typer.blur();
+  }
+  // Toggle on touchend (still a user gesture, so focus() may open the keyboard)
+  // and cancel the follow-up click; on desktop the click path is used instead.
+  kbdBtn.addEventListener('mousedown', e => e.preventDefault());
+  kbdBtn.addEventListener('touchend', e => { e.preventDefault(); setKeyboard(!kbdOn); }, { passive: false });
+  kbdBtn.addEventListener('click', () => setKeyboard(!kbdOn));
+  // Dismissed with the phone's back gesture: the viewport grows back, focus may linger.
+  if (window.visualViewport) {
+    let lastH = window.visualViewport.height;
+    window.visualViewport.addEventListener('resize', () => {
+      const h = window.visualViewport.height;
+      if (kbdOn && h > lastH + 120) setKeyboard(false);
+      lastH = h;
+    });
+  }
+  typer.addEventListener('blur', () => { if (kbdOn) kbdBtn.classList.remove('on'); });
   typer.addEventListener('beforeinput', e => {
     if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') { e.preventDefault(); send({ t: 'k', k: 'enter' }); }
   });
@@ -226,11 +266,36 @@
   keepAwake();
 
   // ------------------------------------------------------------ settings state
+  function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function applyTheme() {
+    const t = S.THEMES[eff.theme] || S.THEMES.graphite;
+    const accent = hexToRgb(eff.accent) ? eff.accent : t.accent;
+    const rgb = hexToRgb(accent) || [240, 178, 60];
+    const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+    const rs = document.documentElement.style;
+    rs.setProperty('--bg', t.bg); rs.setProperty('--pad', t.pad); rs.setProperty('--pad-edge', t.edge); rs.setProperty('--edge', t.edge);
+    rs.setProperty('--panel', t.panel); rs.setProperty('--panel-2', t.panel2); rs.setProperty('--line', t.line);
+    rs.setProperty('--text', t.text); rs.setProperty('--muted', t.muted); rs.setProperty('--faint', t.faint);
+    rs.setProperty('--accent', accent);
+    rs.setProperty('--accent-soft', 'rgba(' + rgb.join(',') + ',0.16)');
+    rs.setProperty('--accent-ink', lum > 0.6 ? '#141414' : '#ffffff');
+    inkRGB = rgb.join(',');
+    document.body.dataset.texture = eff.texture || 'plain';
+    document.body.dataset.corners = eff.corners || 'round';
+    if (t.light) document.body.dataset.light = ''; else delete document.body.dataset.light;
+    const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', t.bg);
+  }
   function recompute() {
     eff = S.effective(user, system);
     buttonsEl.hidden = !eff.buttons;
     sendCfg();
-    if (!eff.ink) { contacts = []; trail = []; drawInk(); }
+    applyTheme();
+    if ((eff.inkStyle || 'rings') === 'off') { contacts = []; trail = []; drawInk(); }
     resizeCanvas();
     if (typeof applyOrientation === 'function') { applyOrientation(); paintRotate(); }
   }
@@ -337,6 +402,34 @@
     return group(title, [segs, dirs, custom]);
   }
 
+  function segs(k, options, cls) {
+    return el('div', { class: 'segs ' + (cls || '') }, options.map(([v, text]) =>
+      el('button', { class: 'seg' + (String(eff[k]) === String(v) ? ' on' : ''), text, onclick: () => { update({ [k]: v }); renderSheet(); } })));
+  }
+  function appearanceGroup() {
+    const swatches = el('div', { class: 'swatches' }, Object.entries(S.THEMES).map(([name, t]) => {
+      const b = el('button', { class: 'swatch' + (eff.theme === name ? ' on' : ''), text: t.label,
+        onclick: () => { update({ theme: name, accent: '' }); renderSheet(); } });
+      b.style.setProperty('--sw-bg', t.pad); b.style.setProperty('--sw-text', t.text); b.style.setProperty('--sw-accent', t.accent);
+      return b;
+    }));
+    const t = S.THEMES[eff.theme] || S.THEMES.graphite;
+    const color = el('input', { type: 'color', value: hexToRgb(eff.accent) ? eff.accent : t.accent, 'aria-label': 'Accent colour',
+      onchange: e => { update({ accent: e.target.value }); renderSheet(); } });
+    const reset = eff.accent ? el('button', { class: 'link', text: 'Use theme colour', onclick: () => { update({ accent: '' }); renderSheet(); } }) : null;
+    return group('Appearance', [
+      swatches,
+      el('div', { class: 'row' }, [lbl('Accent colour', 'Touch ink, switches, highlights'), el('div', { class: 'colorwrap' }, [reset, color])]),
+      el('div', { class: 'row' }, [lbl('Pad surface')]),
+      segs('texture', [['plain', 'Plain'], ['grid', 'Grid'], ['dots', 'Dots'], ['carbon', 'Carbon']], 'four'),
+      el('div', { class: 'row' }, [lbl('Touch effect')]),
+      segs('inkStyle', [['rings', 'Rings'], ['glow', 'Glow'], ['comet', 'Comet'], ['off', 'Off']], 'four'),
+      el('div', { class: 'row' }, [lbl('Corners')]),
+      segs('corners', [['round', 'Round'], ['sharp', 'Sharp']], ''),
+      el('div', { class: 'row' }, [lbl('Vibration', 'Android only')]),
+      segs('haptics', [[0, 'Off'], [0.5, 'Light'], [1, 'Normal'], [2, 'Strong']], 'four'),
+    ]);
+  }
   function renderSheet() {
     body.textContent = '';
     body.appendChild(matchBlock());
@@ -364,11 +457,10 @@
     const ORIENT = [['auto', 'Rotate with the phone'], ['portrait', 'Portrait'], ['landscape-left', 'Landscape, top to the left'], ['landscape-right', 'Landscape, top to the right']];
     const orientRow = choice('Orientation', 'orientation', eff.orientation || 'auto', ORIENT, v => update({ orientation: v }));
     orientRow.querySelector('.vbtn span').textContent = (ORIENT.find(o => o[0] === (eff.orientation || 'auto')) || ORIENT[0])[1];
+    body.appendChild(appearanceGroup());
     body.appendChild(group('Surface', [
       orientRow,
       toggle('Mouse buttons', 'Left and right under the pad', 'buttons'),
-      toggle('Vibrate on clicks', 'Android only', 'haptics'),
-      toggle('Show touches', null, 'ink'),
       toggle('Keep screen on', null, 'keepAwake'),
       el('div', { class: 'row' }, [lbl('Reset phone settings', 'PC sync stays on'), el('button', { class: 'link-danger', text: 'Reset',
         onclick: () => { update(Object.assign({}, S.DEFAULTS)); renderSheet(); } })]),
