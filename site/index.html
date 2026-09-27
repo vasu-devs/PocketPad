@@ -14,7 +14,7 @@
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="preload" href="assets/space-grotesk.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
 @font-face { font-family: "Space Grotesk"; src: url("assets/space-grotesk.woff2") format("woff2"); font-weight: 300 700; font-display: swap; }
 :root {
@@ -23,6 +23,8 @@
   --text: #ece9e2; --muted: #8d939c; --faint: #5c626b;
   --accent: #f0b23c; --accent-ink: #1b1405; --accent-soft: rgba(240,178,60,0.16);
   --font: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Bricolage Grotesque", "Space Grotesk", system-ui, sans-serif;
+  --amber-deep: #b8741a;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --w: 1120px;
@@ -33,7 +35,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 a { color: inherit; }
 svg { fill: currentColor; }
 .wrap { max-width: var(--w); margin: 0 auto; padding: 0 24px; }
-h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.025em; line-height: 1.05; font-variation-settings: "opsz" 96; }
 h2 { font-size: clamp(28px, 4vw, 40px); }
 p { margin: 0; }
 .muted { color: var(--muted); }
@@ -50,41 +52,43 @@ p { margin: 0; }
 .nav-links .gh { display: inline-flex; align-items: center; gap: 6px; }
 .nav-links .gh svg { width: 18px; height: 18px; }
 
-/* hero */
-.hero { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 48px; align-items: center; padding: 56px 0 72px; }
-.hero h1 { font-size: clamp(40px, 6.2vw, 72px); }
-.hero h1 em { font-style: italic; color: var(--accent); }
-.hero .lede { margin-top: 20px; font-size: clamp(17px, 1.6vw, 20px); color: var(--muted); max-width: 30em; }
-.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; align-items: center; }
+/* hero: the page opens as the trackpad itself */
+.hero-wrap { padding: 0 12px; }
+.hero {
+  position: relative; min-height: min(86vh, 860px); border-radius: 30px; overflow: hidden;
+  background: var(--pad); box-shadow: inset 0 0 0 1px var(--edge), inset 0 1px 0 rgba(255,255,255,0.04);
+  background-image: radial-gradient(120% 90% at 50% 40%, rgba(255,255,255,0.035), transparent 70%);
+  touch-action: none; cursor: crosshair;
+}
+.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.hero-copy { position: absolute; left: clamp(20px, 4vw, 56px); right: clamp(20px, 4vw, 56px); bottom: clamp(24px, 5vh, 56px); max-width: 780px; pointer-events: none; }
+.hero-copy > * { pointer-events: auto; }
+.hero h1 { font-size: clamp(44px, 7.6vw, 104px); font-weight: 700; letter-spacing: -0.035em; line-height: 0.96; }
+.hero h1 em { font-style: italic; font-weight: 500; color: var(--accent); }
+.hero .lede { margin-top: 22px; font-size: clamp(16px, 1.5vw, 19px); color: var(--muted); max-width: 30em; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; align-items: center; }
 .btn { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 22px 0 18px; border-radius: 999px; text-decoration: none; font-weight: 600; font-size: 16px; border: 1px solid transparent; transition: transform 0.15s var(--ease), background 0.2s; }
 .btn:active { transform: scale(0.98); }
 .btn svg { width: 20px; height: 20px; }
 .btn-primary { background: var(--accent); color: var(--accent-ink); }
 .btn-primary:hover { background: #f6c257; }
-.btn-ghost { background: transparent; color: var(--text); border-color: var(--line); }
+.btn-ghost { background: rgba(11,12,14,0.5); color: var(--text); border-color: var(--line); backdrop-filter: blur(6px); }
 .btn-ghost:hover { background: var(--panel); }
 .cta-note { width: 100%; font-size: 14px; color: var(--faint); }
 .cta-note a { color: var(--muted); }
-
-/* live demo */
-.demo { position: relative; aspect-ratio: 5 / 4.6; user-select: none; }
-.laptop { position: absolute; left: 0; top: 4%; width: 74%; aspect-ratio: 16 / 10.6; }
-.screen { position: absolute; inset: 0 0 8% 0; border-radius: 14px; background: linear-gradient(160deg, #1a1e25, #0f1216); box-shadow: inset 0 0 0 1px var(--edge), 0 30px 80px rgba(0,0,0,0.5); overflow: hidden; }
-.screen .win { position: absolute; left: 10%; top: 14%; width: 62%; height: 60%; border-radius: 8px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
-.screen .win::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 18%; border-radius: 8px 8px 0 0; background: var(--panel-2); }
-.screen .win i { position: absolute; left: 8%; right: 8%; height: 6%; border-radius: 3px; background: var(--line); }
-.screen .win i:nth-child(1) { top: 30%; width: 60%; } .screen .win i:nth-child(2) { top: 45%; width: 75%; } .screen .win i:nth-child(3) { top: 60%; width: 50%; } .screen .win i:nth-child(4) { top: 75%; width: 68%; }
-.screen .taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 9%; background: rgba(0,0,0,0.35); border-top: 1px solid var(--line); }
-.cursor { position: absolute; width: 5.5%; height: auto; left: 40%; top: 40%; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); transition: none; will-change: transform; }
-.base { position: absolute; left: -3%; right: -3%; bottom: 0; height: 8%; border-radius: 0 0 14px 14px; background: linear-gradient(#22262d, #15181d); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-.base::after { content: ""; position: absolute; left: 42%; right: 42%; top: 0; height: 26%; border-radius: 0 0 6px 6px; background: #0b0c0e; }
-.phone { position: absolute; right: 0; bottom: 0; width: 34%; aspect-ratio: 9 / 19; border-radius: 12% / 6%; background: #050607; box-shadow: inset 0 0 0 2px #2a2e35, 0 30px 70px rgba(0,0,0,0.6); padding: 3.5%; touch-action: none; cursor: crosshair; }
-.phone .pad { position: absolute; inset: 4% 5% 11% 5%; border-radius: 12%; background: var(--pad); box-shadow: inset 0 0 0 1px var(--edge); overflow: hidden; }
-.phone canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.phone .dock { position: absolute; left: 0; right: 0; bottom: 3.5%; height: 6%; display: flex; align-items: center; justify-content: center; font-size: clamp(8px, 1vw, 11px); color: var(--faint); font-family: var(--mono); }
-.phone .dock b { color: var(--accent); font-weight: 500; }
-.demo-hint { position: absolute; right: 0; bottom: -34px; width: 34%; text-align: center; font-size: 13px; color: var(--faint); }
-.demo-hint.gone { opacity: 0; transition: opacity 0.5s; }
+/* the mirror: a laptop screen pinned inside the pad, showing where your cursor went */
+.mirror { position: absolute; top: clamp(16px, 3vw, 36px); right: clamp(16px, 3vw, 36px); width: clamp(180px, 26vw, 340px); aspect-ratio: 16 / 10; border-radius: 12px;
+  background: linear-gradient(160deg, #1a1e25, #0f1216); box-shadow: inset 0 0 0 1px var(--edge), 0 24px 60px rgba(0,0,0,0.45); overflow: hidden; pointer-events: none; }
+.mirror .win { position: absolute; left: 10%; top: 14%; width: 62%; height: 60%; border-radius: 6px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+.mirror .win::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 18%; border-radius: 6px 6px 0 0; background: var(--panel-2); }
+.mirror .win i { position: absolute; left: 8%; height: 6%; border-radius: 3px; background: var(--line); }
+.mirror .win i:nth-child(1) { top: 30%; width: 60%; } .mirror .win i:nth-child(2) { top: 45%; width: 75%; } .mirror .win i:nth-child(3) { top: 60%; width: 50%; } .mirror .win i:nth-child(4) { top: 75%; width: 68%; }
+.mirror .taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 9%; background: rgba(0,0,0,0.35); border-top: 1px solid var(--line); }
+.mirror .cursor { position: absolute; width: 6%; left: 40%; top: 40%; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+.mirror .cap { position: absolute; left: 10px; bottom: 10px; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.mirror .cap b { color: var(--accent); font-weight: 500; }
+.hero-hint { position: absolute; top: clamp(20px, 3vw, 40px); left: clamp(20px, 4vw, 56px); margin: 0; font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: 0.02em; transition: opacity 0.5s; }
+.hero-hint.gone { opacity: 0; }
 
 /* sections */
 section { padding: 88px 0; border-top: 1px solid var(--line); }
@@ -152,8 +156,9 @@ html.js .rv.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
 
 @media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; gap: 56px; padding-top: 24px; }
-  .demo { max-width: 520px; }
+  .hero { min-height: 82vh; }
+  .mirror { width: 150px; }
+  .hero-hint { max-width: 46%; font-size: 11px; line-height: 1.4; }
   .ledger { grid-template-columns: 1fr; }
   .split { grid-template-columns: 1fr; }
   .mode { grid-template-columns: 1fr; gap: 8px; }
@@ -164,7 +169,6 @@ html.js .rv.in { opacity: 1; transform: none; }
   section { padding: 64px 0; }
   .ledger .row { grid-template-columns: 44px 1fr; }
   .ledger .r { grid-column: 2; }
-  .demo-hint { display: none; }
   .tab span { display: none; }
 }
 </style>
@@ -182,31 +186,25 @@ html.js .rv.in { opacity: 1; transform: none; }
 </header>
 
 <main>
-  <div class="wrap hero">
-    <div>
-      <h1>Your phone is the <em>trackpad</em> you wanted.</h1>
-      <p class="lede">Every gesture from a Windows precision touchpad, on the screen already in your pocket. Runs against Windows, macOS and Linux. Nothing to install on the phone. Free and open source.</p>
-      <div class="cta">
-        <a class="btn btn-primary" id="dl-main" href="https://github.com/vasu-devs/PocketPad/releases/latest"><svg viewBox="0 0 256 256"><path d="M224,152v56a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V152a8,8,0,0,1,16,0v56H208V152a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,132.69V40a8,8,0,0,0-16,0v92.69L93.66,106.34a8,8,0,0,0-11.32,11.32Z"/></svg><span id="dl-label">Download</span></a>
-        <a class="btn btn-ghost" href="#install">Other ways to install</a>
-        <p class="cta-note" id="dl-note">One file, no installer. <a href="https://github.com/vasu-devs/PocketPad/releases/latest">All builds on GitHub</a>.</p>
+  <div class="hero-wrap">
+    <div class="hero" id="hero" aria-label="A live trackpad surface. Move your pointer or finger across it.">
+      <canvas id="ink"></canvas>
+      <p class="hero-hint" id="hero-hint">This whole panel is a trackpad. Move across it.</p>
+      <div class="mirror" aria-hidden="true">
+        <div class="win"><i></i><i></i><i></i><i></i></div>
+        <div class="taskbar"></div>
+        <svg class="cursor" id="cursor" viewBox="0 0 24 24"><path d="M5 3l14 9-6.5 1.2L16 20l-2.6 1.2-3.4-6.6L5 19z" fill="#f4f1ea" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        <span class="cap">your laptop <b>3 ms</b></span>
       </div>
-    </div>
-
-    <div class="demo" id="demo" aria-label="Interactive demo: drag on the phone to move the cursor on the laptop">
-      <div class="laptop">
-        <div class="screen">
-          <div class="win"><i></i><i></i><i></i><i></i></div>
-          <div class="taskbar"></div>
-          <svg class="cursor" id="cursor" viewBox="0 0 24 24"><path d="M5 3l14 9-6.5 1.2L16 20l-2.6 1.2-3.4-6.6L5 19z" fill="#f4f1ea" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg>
+      <div class="hero-copy">
+        <h1>Your phone is the <em>trackpad</em> you wanted.</h1>
+        <p class="lede">Every precision touchpad gesture, on the screen already in your pocket. Windows, macOS and Linux. Nothing to install on the phone. Free and open source.</p>
+        <div class="cta">
+          <a class="btn btn-primary" id="dl-main" href="https://github.com/vasu-devs/PocketPad/releases/latest"><svg viewBox="0 0 256 256"><path d="M224,152v56a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V152a8,8,0,0,1,16,0v56H208V152a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,132.69V40a8,8,0,0,0-16,0v92.69L93.66,106.34a8,8,0,0,0-11.32,11.32Z"/></svg><span id="dl-label">Download</span></a>
+          <a class="btn btn-ghost" href="#install">Other ways to install</a>
+          <p class="cta-note" id="dl-note">One file, no installer. <a href="https://github.com/vasu-devs/PocketPad/releases/latest">All builds on GitHub</a>.</p>
         </div>
-        <div class="base"></div>
       </div>
-      <div class="phone" id="phone">
-        <div class="pad"><canvas id="ink"></canvas></div>
-        <div class="dock">PocketPad&nbsp;<b id="lat">4 ms</b></div>
-      </div>
-      <p class="demo-hint" id="demo-hint">Drag here</p>
     </div>
   </div>
 
@@ -377,36 +375,34 @@ pocketpad</pre>
   document.querySelectorAll('.rv').forEach(el => io.observe(el));
   setTimeout(() => document.querySelectorAll('.rv').forEach(el => el.classList.add('in')), 2500); // safety net
 
-  // ---- live demo: drag on the phone, the cursor moves on the laptop
-  const phone = document.getElementById('phone'), canvas = document.getElementById('ink'), ctx = canvas.getContext('2d');
-  const cursor = document.getElementById('cursor'), screen = cursor.parentElement, hint = document.getElementById('demo-hint'), lat = document.getElementById('lat');
+  // ---- the hero is a trackpad: your pointer draws ink, the mirror shows the mapped cursor
+  const hero = document.getElementById('hero'), canvas = document.getElementById('ink'), ctx = canvas.getContext('2d');
+  const cursor = document.getElementById('cursor'), hint = document.getElementById('hero-hint');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let cx = 0.42, cy = 0.42, last = null, contacts = [], trail = [], raf = 0, idle = true, t0 = performance.now();
+  let contacts = [], trail = [], raf = 0, cx = 0.42, cy = 0.42, lastPt = null;
   function size() { const r = canvas.getBoundingClientRect(); const d = Math.min(2, devicePixelRatio || 1); canvas.width = r.width * d; canvas.height = r.height * d; ctx.setTransform(d, 0, 0, d, 0, 0); }
   size(); addEventListener('resize', size);
   function place() { cursor.style.left = (cx * 100) + '%'; cursor.style.top = (cy * 100) + '%'; }
   function draw() {
     raf = 0; const r = canvas.getBoundingClientRect(); ctx.clearRect(0, 0, r.width, r.height);
-    const now = performance.now(); trail = trail.filter(p => now - p.t < 380);
+    const now = performance.now(); const life = reduce ? 1 : 520; trail = trail.filter(p => now - p.t < life);
     ctx.lineWidth = 1.25;
-    for (const p of trail) { const a = 1 - (now - p.t) / 380; ctx.beginPath(); ctx.arc(p.x, p.y, 4 + 8 * (1 - a), 0, Math.PI * 2); ctx.strokeStyle = 'rgba(240,178,60,' + (0.3 * a).toFixed(3) + ')'; ctx.stroke(); }
-    for (const c of contacts) { ctx.beginPath(); ctx.arc(c.x, c.y, 14, 0, Math.PI * 2); ctx.fillStyle = 'rgba(240,178,60,0.12)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(240,178,60,0.85)'; ctx.stroke(); }
+    for (const p of trail) { const k = 1 - (now - p.t) / life; ctx.beginPath(); ctx.arc(p.x, p.y, 6 + 14 * (1 - k), 0, Math.PI * 2); ctx.strokeStyle = 'rgba(184,116,26,' + (0.45 * k).toFixed(3) + ')'; ctx.stroke(); }
+    for (const c of contacts) { ctx.beginPath(); ctx.arc(c.x, c.y, 22, 0, Math.PI * 2); ctx.fillStyle = 'rgba(240,178,60,0.12)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(240,178,60,0.9)'; ctx.stroke(); }
     if (contacts.length || trail.length) raf = requestAnimationFrame(draw);
   }
-  function local(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-  function down(e) { idle = false; hint.classList.add('gone'); last = local(e); contacts = [last]; trail.push({ ...last, t: performance.now() }); if (!raf) raf = requestAnimationFrame(draw); phone.setPointerCapture(e.pointerId); e.preventDefault(); }
-  function move(e) {
-    if (!last) return; const p = local(e); const r = screen.getBoundingClientRect();
-    cx = Math.min(0.94, Math.max(0, cx + (p.x - last.x) * 1.6 / r.width)); cy = Math.min(0.9, Math.max(0, cy + (p.y - last.y) * 1.6 / r.height));
-    last = p; contacts = [p]; trail.push({ ...p, t: performance.now() }); if (trail.length > 200) trail.shift(); place(); if (!raf) raf = requestAnimationFrame(draw);
+  function local(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height }; }
+  function onMove(e) {
+    const p = local(e);
+    if (lastPt) { cx = Math.min(0.94, Math.max(0, cx + (p.x - lastPt.x) * 1.4 / p.w)); cy = Math.min(0.9, Math.max(0, cy + (p.y - lastPt.y) * 1.4 / p.h)); place(); }
+    lastPt = p; contacts = [p]; if (!reduce) { trail.push({ x: p.x, y: p.y, t: performance.now() }); if (trail.length > 240) trail.shift(); }
+    hint.classList.add('gone'); if (!raf) raf = requestAnimationFrame(draw);
   }
-  function up() { last = null; contacts = []; if (!raf) raf = requestAnimationFrame(draw); }
-  phone.addEventListener('pointerdown', down); phone.addEventListener('pointermove', move); phone.addEventListener('pointerup', up); phone.addEventListener('pointercancel', up);
+  function onLeave() { lastPt = null; contacts = []; if (!raf) raf = requestAnimationFrame(draw); }
+  hero.addEventListener('pointermove', onMove);
+  hero.addEventListener('pointerdown', e => { if (e.target.closest('a, button')) return; onMove(e); e.preventDefault(); });
+  hero.addEventListener('pointerleave', onLeave); hero.addEventListener('pointerup', onLeave); hero.addEventListener('pointercancel', onLeave);
   place();
-  // gentle idle drift until someone touches it
-  if (!reduce) (function drift() { if (idle) { const t = (performance.now() - t0) / 1000; cx = 0.42 + 0.08 * Math.sin(t * 0.7); cy = 0.42 + 0.06 * Math.sin(t * 0.9 + 1); place(); } requestAnimationFrame(drift); })();
-  // latency readout wiggles like the real one
-  setInterval(() => { lat.textContent = (3 + Math.round(Math.random() * 3)) + ' ms'; }, 3000);
 })();
 </script>
 </body>
